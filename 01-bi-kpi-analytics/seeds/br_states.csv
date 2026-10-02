@@ -1,0 +1,28 @@
+state,state_name,region
+AC,Acre,Norte
+AP,Amapá,Norte
+AM,Amazonas,Norte
+PA,Pará,Norte
+RO,Rondônia,Norte
+RR,Roraima,Norte
+TO,Tocantins,Norte
+AL,Alagoas,Nordeste
+BA,Bahia,Nordeste
+CE,Ceará,Nordeste
+MA,Maranhão,Nordeste
+PB,Paraíba,Nordeste
+PE,Pernambuco,Nordeste
+PI,Piauí,Nordeste
+RN,Rio Grande do Norte,Nordeste
+SE,Sergipe,Nordeste
+DF,Distrito Federal,Centro-Oeste
+GO,Goiás,Centro-Oeste
+MT,Mato Grosso,Centro-Oeste
+MS,Mato Grosso do Sul,Centro-Oeste
+ES,Espírito Santo,Sudeste
+MG,Minas Gerais,Sudeste
+RJ,Rio de Janeiro,Sudeste
+SP,São Paulo,Sudeste
+PR,Paraná,Sul
+RS,Rio Grande do Sul,Sul
+SC,Santa Catarina,Sul

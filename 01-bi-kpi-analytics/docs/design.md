@@ -266,6 +266,54 @@ Todos se pueden cortar por fecha, región, estado, categoría, vendedor y métod
 
 ---
 
+## 6.1 Contingencias y eventos
+
+Dos niveles: que **el sistema** siga funcionando ante lo inesperado y que **el negocio** reaccione a tiempo.
+
+### A. Calendario de eventos (`config/events.yaml`)
+
+| Tipo | Ejemplo | Qué hace el sistema |
+|---|---|---|
+| **Planeado** | Black Friday, Navidad, Carnaval, campañas | Se registra con anticipación: la meta se ajusta, el detector **no** lo marca como anomalía y el dashboard lo anota en las gráficas |
+| **No planeado** | Huelga de transportistas, falla del sitio | Se detecta, se registra (manual o al confirmar una alerta) y queda anotado: sus días se **excluyen de la línea base** para no "enseñarle" al detector que lo anormal es normal |
+
+### B. Alerta temprana (antes de que el daño sea visible)
+
+Un retraso de entrega solo se ve cuando el pedido **no llega**, días después. Por eso se vigilan **indicadores
+adelantados**:
+
+| Indicador adelantado | Anticipa |
+|---|---|
+| Horas de aprobación → envío al transportista | Retrasos de entrega |
+| % pedidos que pasaron su fecha límite de envío sin salir | Incumplimiento de OTD |
+| % pedidos abiertos con fecha estimada vencida | Reseñas negativas |
+| Pedidos por hora vs. lo esperado | Caídas del sitio o picos de demanda |
+
+### C. Playbooks (qué hacer cuando suena una alerta)
+
+Cada regla de alerta tiene un responsable y acciones sugeridas, por ejemplo:
+*"OTD cae < 85 % en una región → Logística: revisar transportistas de la región; Atención a clientes: avisar
+proactivamente a pedidos en riesgo (lista adjunta); Comercial: pausar promociones con envío prometido a esa región."*
+La alerta incluye la **lista de pedidos en riesgo**, no solo el número.
+
+### D. Análisis de impacto (después del evento)
+
+Para cada evento: ventas, OTD y calificación **reales vs. esperados** (línea base sin el evento) → "la huelga costó
+X pedidos tardíos y bajó la calificación Y puntos". Sirve para planear el siguiente.
+
+### E. Resiliencia del pipeline (que el sistema no se caiga)
+
+| Riesgo | Medida |
+|---|---|
+| La fuente (API, base) no responde | Reintentos con espera creciente; respaldo en caché (ya implementado para tipo de cambio) |
+| Datos incompletos o tardíos | Prueba de frescura y completitud: el periodo se marca "incompleto" y no dispara alertas de caída |
+| Pico de volumen (Black Friday ×5) | Carga incremental por marca de agua; prueba de carga con volumen ×5 |
+| Una carga falla a la mitad | Cargas idempotentes: se puede repetir sin duplicar; el dashboard sigue mostrando la última carga buena |
+| Datos corruptos | Pruebas de calidad + cuarentena (sección 7) |
+| Tormenta de alertas | Agrupación y silencio: una alerta por evento, no 50 |
+
+---
+
 ## 7. Calidad y gobernanza de datos
 
 Con datos reales, los problemas de calidad **no se inventan: se encuentran**. Esperamos (y se confirma al cargar):
@@ -416,6 +464,7 @@ banda esperada.
 | 3 | Motor de KPIs + metas + RLS | Pruebas unitarias y de seguridad |
 | 4 | Dashboard (5 páginas) | E2E + capturas → **revisión tuya** |
 | 5 | Anomalías + alertas + `run-daily` + `replay` | Debe detectar los eventos reales |
+| 5b | Calendario de eventos, alerta temprana, playbooks, análisis de impacto, pruebas de resiliencia | La huelga se anticipa con indicadores adelantados |
 | 6 | Benchmark, CI, user guide, guía Quick Suite, README final | **Revisión tuya** → Pull Request |
 
 ---

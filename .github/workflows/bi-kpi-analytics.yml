@@ -1,0 +1,33 @@
+name: 01 · BI & KPI Analytics
+
+on:
+  push:
+    paths: ["01-bi-kpi-analytics/**", ".github/workflows/bi-kpi-analytics.yml"]
+  pull_request:
+    paths: ["01-bi-kpi-analytics/**", ".github/workflows/bi-kpi-analytics.yml"]
+
+defaults:
+  run:
+    working-directory: 01-bi-kpi-analytics
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: 01-bi-kpi-analytics/pyproject.toml
+      - run: pip install -e ".[dev]"
+      - name: Lint
+        run: |
+          ruff check src tests
+          ruff format --check src tests
+      - name: Tests
+        run: pytest
+      - name: Smoke run on synthetic data
+        run: |
+          bi sample --orders-per-day 10
+          bi load
