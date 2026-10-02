@@ -11,6 +11,8 @@ data, define and monitor KPIs, build dashboards, secure them by role, and alert 
 una vacante real de Analista de BI. La documentación técnica está en español: empezar por el
 [diseño](docs/design.md).*
 
+![Executive summary: KPIs against target, sales vs plan, regions, what is off target and a plain-language reading](docs/screenshots/01-resumen.png)
+
 ## What it found in the data
 
 - **The May 2018 truckers' strike was flagged 7 days before deliveries failed.** Not by the
