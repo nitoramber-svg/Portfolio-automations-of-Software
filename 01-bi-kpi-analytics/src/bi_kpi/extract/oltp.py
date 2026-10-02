@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import csv
 import sqlite3
+from contextlib import closing
 from pathlib import Path
 
 import duckdb
@@ -23,7 +24,8 @@ WATERMARKS = {"orders": "order_purchase_timestamp"}
 def seed_oltp(raw_dir: Path, db_path: Path) -> None:
     db_path.parent.mkdir(parents=True, exist_ok=True)
     db_path.unlink(missing_ok=True)
-    with sqlite3.connect(db_path) as db:
+    # sqlite3's own context manager commits but never closes; Windows can't delete an open file.
+    with closing(sqlite3.connect(db_path)) as db, db:
         for table in OLTP_TABLES:
             file_name, _ = FILES[table]
             with (raw_dir / file_name).open(encoding="utf-8-sig", newline="") as fh:
@@ -50,7 +52,7 @@ def extract_oltp(
         ),
     }
     counts: dict[str, int] = {}
-    with sqlite3.connect(db_path) as db:
+    with closing(sqlite3.connect(db_path)) as db:
         for table, sql in queries.items():
             df = pd.read_sql_query(sql, db, params=(since, since), dtype=str)
             con.register("_extract", df)
