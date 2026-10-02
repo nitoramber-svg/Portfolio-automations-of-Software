@@ -1,0 +1,16 @@
+# Sales plan (Olist publishes no targets, so they are derived).
+#
+# The design proposed "same month last year x (1 + growth)". Measured on the data, that is
+# useless here: Olist grew ~8x from Jan 2017 to Jan 2018, so 2018 would beat such a plan by
+# 600 %+. The plan is instead a run rate:
+#
+#   target(region, month) = average GMV of the 3 previous months x (1 + monthly_growth)
+#
+# and exists only when the month and those 3 months are complete (see dim_date.is_complete_month).
+# Black Friday and other planned events are adjusted in step 5b (config/events.yaml).
+
+monthly_growth: 0.05
+lookback_months: 3
+
+# Explicit targets win over the derived ones: {year_month: 201805, region: Sudeste, target_brl: 700000}
+overrides: []

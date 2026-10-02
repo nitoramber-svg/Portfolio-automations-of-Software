@@ -1,0 +1,4 @@
+review_id,order_id,review_score,review_comment_title,review_comment_message,review_creation_date,review_answer_timestamp
+r1,o1,5,,,2017-03-09 00:00:00,2017-03-10 12:00:00
+r2,o2,1,Atraso,"Chegou atrasado, péssimo",2017-03-24 00:00:00,2017-03-24 06:00:00
+r3,o5,4,,Bom,2017-03-16 00:00:00,2017-03-17 00:00:00

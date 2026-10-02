@@ -1,0 +1,6 @@
+data/*
+!data/.gitkeep
+outbox/
+*.duckdb
+*.duckdb.wal
+*.db

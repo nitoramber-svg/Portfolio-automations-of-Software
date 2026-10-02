@@ -1,0 +1,18 @@
+# Where each source lives and how it is read.
+data_dir: data
+raw_dir: data/raw/olist          # Olist CSVs (real or sample)
+oltp_db: data/oltp.db            # SQLite acting as the transactional source system
+warehouse: data/warehouse.duckdb
+
+kaggle_dataset: olistbr/brazilian-ecommerce
+
+fx:
+  api_url: https://api.frankfurter.app   # ECB reference rates, no API key
+  base: BRL
+  symbols: [MXN, USD]
+  cache: data/fx_rates.csv
+  # Used only when the API and the cache are unavailable. Approximate 2017-2018
+  # averages; every converted row is flagged fx_source = 'fallback'.
+  fallback_rates:
+    MXN: 5.70
+    USD: 0.30
