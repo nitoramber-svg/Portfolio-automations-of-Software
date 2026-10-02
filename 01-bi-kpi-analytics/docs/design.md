@@ -1,29 +1,30 @@
-# Fase 0 — Diseño: BI & KPI Analytics
+# Fase 0 — Diseño: BI & KPI Analytics (datos reales de Olist)
 
-> **Estado:** borrador para aprobación. No hay código todavía.
+> **Estado:** borrador v2 para aprobación. No hay código todavía.
 > **Vacante de referencia:** Analista de QuickSuite (BI) — CDMX, remoto híbrido, $55k–62k MXN/mes.
 > **Alcance:** 100 % local y gratuito. Guía para migrar a AWS/Amazon Quick Suite al final.
+> **Datos:** reales y públicos — *Brazilian E-Commerce Public Dataset by Olist*.
 
 ---
 
 ## 1. Objetivo
 
-Construir un sistema de Business Intelligence de punta a punta que haga **cada responsabilidad de la vacante**:
-tomar datos crudos de varias fuentes, limpiarlos, modelarlos en estrella, calcular KPIs, mostrarlos en un
-dashboard interactivo, detectar anomalías y mandar alertas, todo con seguridad por rol.
+Construir un sistema de Business Intelligence de punta a punta, **sobre datos reales de una empresa real**, que haga
+cada responsabilidad de la vacante: tomar datos crudos de varias fuentes, limpiarlos, modelarlos en estrella,
+calcular KPIs, mostrarlos en un dashboard interactivo, detectar anomalías y mandar alertas, con seguridad por rol.
 
 ### Vacante → solución
 
 | Responsabilidad / requisito | Cómo lo cubre el proyecto | Módulo |
 |---|---|---|
 | Diseñar y mantener tableros y modelos analíticos | Dashboard de 5 páginas + modelo estrella | `dashboard/`, `sql/marts/` |
-| Conectar SQL, nube, APIs y archivos planos | 3 fuentes reales: base SQL (ERP simulado), CSV/Excel, API de tipo de cambio | `extract/` |
-| Limpiar y estructurar los datos | Capa *staging* con limpieza, tipado y deduplicación | `sql/staging/` |
+| Conectar SQL, nube, APIs y archivos planos | 3 tipos de fuente: base SQL transaccional, archivos CSV, API de tipo de cambio | `extract/` |
+| Limpiar y estructurar los datos | Capa *staging*: tipado, deduplicación, traducción de categorías, normalización de ciudades | `sql/staging/` |
 | Definir, validar y monitorear KPIs | KPIs declarados en `kpis.yaml` (fórmula, meta, dirección, umbrales) | `kpis/` |
 | Optimizar consultas y velocidad de carga | Tablas agregadas + benchmark documentado antes/después | `sql/marts/agg_*`, `scripts/benchmark.py` |
 | Alertas automáticas y análisis de anomalías | Detección robusta (mediana + MAD) + reglas vs. meta → correo/Slack | `anomalies/`, `alerts/` |
-| Integridad, precisión y gobernanza | Pruebas de calidad de datos, cuarentena de filas inválidas, linaje | `quality/` |
-| Seguridad a nivel de fila (RLS) | Usuarios por rol/región; el filtro se aplica en la consulta, no solo en la UI | `security/` |
+| Integridad, precisión y gobernanza | Pruebas de calidad sobre problemas **reales** del dataset, cuarentena, conciliación | `quality/` |
+| Seguridad a nivel de fila (RLS) | Por región de Brasil **y por vendedor** (portal de seller); filtro en la capa de consulta | `security/` |
 | Publicación de espacios de trabajo | Exportación de datasets + reglas RLS en formato compatible con Quick Suite | `docs/quicksuite.md` |
 | Modelos estrella / copo de nieve, ETL/ELT | Patrón ELT: raw → staging → marts (estrella) | `sql/` |
 | Capacitar a usuarios finales | Manual de usuario con capturas | `docs/user-guide.md` |
@@ -32,28 +33,33 @@ dashboard interactivo, detectar anomalías y mandar alertas, todo con seguridad 
 
 ---
 
-## 2. Caso de negocio (empresa ficticia)
+## 2. Los datos: Olist
 
-**Distribuidora Nova S.A. de C.V.** — vende productos de consumo en México.
+**Olist** es un marketplace brasileño que conecta pequeñas tiendas con grandes plataformas de e-commerce.
+La empresa publicó sus datos comerciales reales (anonimizados) de **~100,000 pedidos entre 2016 y 2018**.
 
-- **4 regiones:** Norte, Centro, Occidente, Sur (32 estados asignados a cada región).
-- **3 canales:** Tienda física, E-commerce, Mayoreo.
-- **~300 productos** en 6 categorías (Abarrotes, Bebidas, Limpieza, Cuidado personal, Mascotas, Hogar).
-- **~5,000 clientes** en 3 segmentos (Minorista, Mayorista, Corporativo).
-- **24 meses de historia diaria** (~250,000 líneas de pedido).
-- Metas mensuales de venta por región (el Excel que "manda dirección").
+| Archivo | Contenido | Uso en el proyecto |
+|---|---|---|
+| `olist_orders_dataset` | Pedido, estatus, fechas de compra, aprobación, envío, **entrega real** y **entrega estimada** | Hechos de pedidos y entregas |
+| `olist_order_items_dataset` | Líneas: producto, vendedor, **precio** y **flete** | Hechos de ventas |
+| `olist_order_payments_dataset` | Método de pago, mensualidades, monto | Mezcla de pagos, conciliación |
+| `olist_order_reviews_dataset` | Calificación 1–5 y comentarios | Satisfacción del cliente |
+| `olist_customers_dataset` | Cliente (único y por pedido), ciudad, estado | Dimensión cliente |
+| `olist_sellers_dataset` | Vendedor, ciudad, estado | Dimensión vendedor + RLS |
+| `olist_products_dataset` | Categoría, peso, medidas, fotos | Dimensión producto |
+| `product_category_name_translation` | Categoría portugués → inglés | Traducción (agregamos español) |
+| `olist_geolocation_dataset` | Código postal → lat/long | Mapas |
 
-Los datos son sintéticos pero realistas: estacionalidad (diciembre alto, enero bajo), día de la semana,
-crecimiento anual y ruido. Con **semilla fija**, así cualquiera obtiene exactamente los mismos números.
+**Licencia:** CC BY-NC-SA 4.0 — uso no comercial con atribución. Los datos **no se suben al repo**: un comando los
+descarga (Kaggle API) o los toma de un ZIP local. Las pruebas usan un *fixture* pequeño hecho a mano con el mismo esquema.
 
-**Anomalías sembradas a propósito** (para demostrar que el detector funciona y probarlo):
+### Qué no existe en los datos (y cómo lo resolvemos, declarado en el README)
 
-| # | Qué pasa | Dónde | KPI que debe disparar |
-|---|---|---|---|
-| A1 | Caída del e-commerce 3 días (falla del sitio) | Sur, E-commerce | Ventas netas |
-| A2 | Pico de devoluciones de una marca (lote defectuoso) | Nacional, Limpieza | Tasa de devolución |
-| A3 | Retrasos de entrega 2 semanas (problema logístico) | Occidente | Entregas a tiempo |
-| A4 | Descuento excesivo mal capturado | Centro, Mayoreo | Margen bruto % |
+| Falta | Solución |
+|---|---|
+| Metas de venta | Meta derivada: mismo mes del año anterior × (1 + crecimiento objetivo), configurable en `targets.yaml` |
+| Costo del producto (margen) | Se sustituye por **flete como % de la venta** y **ventas netas de cancelaciones** |
+| Moneda local | Conversión real BRL → MXN y USD con el tipo de cambio histórico de cada día |
 
 ---
 
@@ -62,9 +68,9 @@ crecimiento anual y ruido. Con **semilla fija**, así cualquiera obtiene exactam
 ```mermaid
 flowchart LR
     subgraph Fuentes
-        A[(ERP simulado<br/>SQLite)]
-        B[/Catálogo CSV<br/>Metas Excel/]
-        C{{API tipo de cambio<br/>USD/MXN}}
+        A[(Base transaccional<br/>SQLite — pedidos, pagos)]
+        B[/CSVs Olist<br/>catálogo, vendedores, reseñas/]
+        C{{API tipo de cambio<br/>BRL→MXN/USD}}
     end
     subgraph Pipeline ELT [Pipeline ELT — Python + DuckDB]
         E[Extract] --> R[(raw)]
@@ -81,19 +87,22 @@ flowchart LR
     K --> D[Dashboard<br/>Streamlit]
     K --> N[Detector de<br/>anomalías]
     N --> L[Alertas<br/>correo / Slack]
-    U[RLS: usuarios y<br/>regiones] --> K
+    U[RLS: región<br/>y vendedor] --> K
 ```
+
+**Cómo se simulan las 3 fuentes con datos reales:** las tablas de pedidos y pagos se cargan primero en una base
+SQLite que hace de "sistema transaccional" y se extraen con SQL (incremental por fecha); catálogo, vendedores y
+reseñas se leen como archivos planos; el tipo de cambio viene de una API pública (Frankfurter / BCE). Si no hay
+internet, se usa un respaldo local versionado.
 
 **Decisiones técnicas**
 
 | Decisión | Elección | Por qué |
 |---|---|---|
 | Almacén analítico | **DuckDB** (un archivo) | SQL analítico rápido, cero servidor. El mismo SQL corre en Athena/Redshift casi sin cambios |
-| Fuente "SQL" | **SQLite** como ERP | Simula extraer de una base transaccional real |
-| Fuente "API" | API pública de tipo de cambio (sin llave) | Demuestra integración con APIs; si no hay internet usa un respaldo local |
 | Transformaciones | **SQL puro** en archivos versionados | Igual que se trabaja con dbt/Athena; fácil de revisar |
 | Dashboard | **Streamlit + Plotly** | Interactivo, se corre con un comando, ideal para capturas |
-| Configuración | YAML (`kpis.yaml`, `users.yaml`, `sources.yaml`) | Agregar un KPI no requiere tocar código |
+| Configuración | YAML (`kpis.yaml`, `users.yaml`, `targets.yaml`, `sources.yaml`) | Agregar un KPI no requiere tocar código |
 | Pruebas | **pytest** + **Playwright** + GitHub Actions | Unitarias, de datos, de integración y de navegador |
 
 ---
@@ -102,143 +111,179 @@ flowchart LR
 
 ```mermaid
 erDiagram
-    fact_sales }o--|| dim_date : date_key
-    fact_sales }o--|| dim_product : product_key
-    fact_sales }o--|| dim_customer : customer_key
-    fact_sales }o--|| dim_region : region_key
-    fact_sales }o--|| dim_channel : channel_key
-    fact_deliveries }o--|| dim_date : promised_date_key
-    fact_deliveries }o--|| dim_region : region_key
+    fact_order_items }o--|| dim_date : purchase_date_key
+    fact_order_items }o--|| dim_product : product_key
+    fact_order_items }o--|| dim_customer : customer_key
+    fact_order_items }o--|| dim_seller : seller_key
+    fact_orders }o--|| dim_date : purchase_date_key
+    fact_orders }o--|| dim_customer : customer_key
+    fact_orders }o--|| dim_payment_type : payment_type_key
+    fact_reviews }o--|| fact_orders : order_id
     fact_targets }o--|| dim_region : region_key
+    dim_customer }o--|| dim_region : region_key
+    dim_seller }o--|| dim_region : region_key
 
-    fact_sales {
-        bigint order_line_id PK
+    fact_order_items {
         varchar order_id
-        int date_key FK
+        int item_seq
+        int purchase_date_key FK
         int product_key FK
+        int seller_key FK
         int customer_key FK
-        int region_key FK
-        int channel_key FK
-        int quantity
-        int returned_qty
-        decimal gross_amount_mxn
-        decimal discount_mxn
-        decimal net_amount_mxn
-        decimal cost_mxn
-        decimal net_amount_usd
+        decimal price_brl
+        decimal freight_brl
+        decimal price_mxn
+        decimal price_usd
     }
-    fact_deliveries {
+    fact_orders {
         varchar order_id PK
-        int promised_date_key FK
-        date delivered_date
-        int region_key FK
-        boolean on_time
+        int purchase_date_key FK
+        int customer_key FK
+        int payment_type_key FK
+        varchar status
+        int items
+        decimal order_value_brl
+        decimal payment_value_brl
+        int installments
+        timestamp approved_at
+        timestamp delivered_at
+        date estimated_delivery
+        int delivery_days
         int days_late
+        boolean on_time
+    }
+    fact_reviews {
+        varchar review_id PK
+        varchar order_id FK
+        int score
+        boolean has_comment
+        int answer_hours
     }
     fact_targets {
         int year_month PK
         int region_key PK
-        decimal target_mxn
+        decimal target_brl
     }
     dim_date {
         int date_key PK
         date date
         int year
         int month
-        varchar month_name
         int week
         varchar weekday
-        boolean is_holiday
+        boolean is_holiday_br
+        boolean is_black_friday
     }
     dim_product {
         int product_key PK
-        varchar sku
-        varchar name
-        varchar category
-        varchar brand
-        decimal list_price
+        varchar product_id
+        varchar category_pt
+        varchar category_es
+        int weight_g
+        int photos
     }
     dim_customer {
         int customer_key PK
-        varchar customer_id
-        varchar segment
+        varchar customer_unique_id
         varchar city
         varchar state
+        int region_key FK
+    }
+    dim_seller {
+        int seller_key PK
+        varchar seller_id
+        varchar city
+        varchar state
+        int region_key FK
     }
     dim_region {
         int region_key PK
         varchar region
         varchar state
     }
-    dim_channel {
-        int channel_key PK
-        varchar channel
+    dim_payment_type {
+        int payment_type_key PK
+        varchar payment_type
     }
 ```
 
-**Granularidad:** `fact_sales` = una línea de pedido; `fact_deliveries` = un pedido; `fact_targets` = región × mes.
+**Granularidad:** `fact_order_items` = una línea de pedido; `fact_orders` = un pedido; `fact_reviews` = una reseña;
+`fact_targets` = región × mes.
 
-**Agregados para rendimiento:** `agg_sales_daily` (día × región × canal × categoría). El dashboard lee de aquí;
-el benchmark compara tiempos contra consultar `fact_sales` directo.
+**Agregados para rendimiento:** `agg_sales_daily` (día × región × categoría) y `agg_delivery_weekly`. El dashboard
+lee de aquí; el benchmark compara tiempos contra consultar los hechos directamente.
 
 ---
 
 ## 5. KPIs
 
-Definidos en `config/kpis.yaml`. Cada KPI tiene: fórmula SQL, unidad, meta, dirección ("más es mejor" o "menos es mejor")
-y umbrales de alerta.
+Definidos en `config/kpis.yaml`. Cada KPI tiene: fórmula SQL, unidad, meta, dirección y umbrales de alerta.
+Moneda seleccionable en el dashboard: **BRL / MXN / USD**.
 
-| KPI | Fórmula | Meta (ejemplo) | Alerta si… |
+| Grupo | KPI | Fórmula | Alerta si… |
 |---|---|---|---|
-| **Ventas netas** | Σ net_amount_mxn | Según Excel de metas | Anomalía estadística o < 90 % de la meta prorrateada |
-| **Cumplimiento de meta** | Ventas netas ÷ meta del periodo | ≥ 100 % | < 90 % |
-| **Margen bruto %** | (Ventas netas − costo) ÷ ventas netas | ≥ 28 % | < 24 % o anomalía |
-| **Ticket promedio** | Ventas netas ÷ # pedidos | — | Anomalía |
-| **Pedidos** | # pedidos distintos | — | Anomalía |
-| **Clientes activos** | # clientes con compra en el periodo | — | Caída > 15 % vs. periodo anterior |
-| **Entregas a tiempo (OTD)** | Pedidos a tiempo ÷ pedidos entregados | ≥ 95 % | < 90 % |
-| **Tasa de devolución** | Unidades devueltas ÷ unidades vendidas | ≤ 3 % | > 5 % o anomalía |
-| **Crecimiento vs. mes anterior / año anterior** | (Actual − anterior) ÷ anterior | — | Informativo |
+| Ventas | **Ventas (GMV)** | Σ precio de pedidos no cancelados | Anomalía o < 90 % de la meta prorrateada |
+| Ventas | **Cumplimiento de meta** | Ventas ÷ meta del periodo | < 90 % |
+| Ventas | **Pedidos** | # pedidos | Anomalía |
+| Ventas | **Ticket promedio** | Ventas ÷ pedidos | Anomalía |
+| Clientes | **Clientes únicos** | # `customer_unique_id` | Caída > 15 % vs. periodo anterior |
+| Clientes | **Tasa de recompra** | Clientes con ≥ 2 pedidos ÷ clientes | Informativo |
+| Operación | **Entregas a tiempo (OTD)** | Entregados ≤ fecha estimada ÷ entregados | < 90 % |
+| Operación | **Días de entrega** | Promedio compra → entrega | Anomalía |
+| Operación | **Flete % de venta** | Σ flete ÷ Σ precio | > 20 % |
+| Operación | **Tasa de cancelación** | Cancelados ÷ pedidos | > 2 % |
+| Satisfacción | **Calificación promedio** | Promedio de reseñas (1–5) | < 4.0 |
+| Satisfacción | **% reseñas negativas** | Reseñas 1–2 ÷ reseñas | > 15 % o anomalía |
+| Marketplace | **Vendedores activos** | # vendedores con venta en el periodo | Informativo |
 
-Todos se pueden cortar por fecha, región, canal y categoría.
+Todos se pueden cortar por fecha, región, estado, categoría, vendedor y método de pago.
+
+**Bonus de análisis:** relación entre retraso de entrega y calificación (¿cuánto baja la calificación por cada día de retraso?).
 
 ---
 
 ## 6. Detección de anomalías y alertas
 
-1. Para cada KPI × región se arma una serie diaria.
-2. **Método robusto:** puntuación z con mediana móvil y MAD (desviación absoluta mediana) en ventana de 28 días,
-   ajustada por día de la semana. Marca anomalía si |z| > 3.5. Es resistente a valores extremos, a diferencia de
-   la media y la desviación estándar.
-3. **Reglas de negocio:** además, compara contra los umbrales de `kpis.yaml` (ej. OTD < 90 %).
-4. Cada alerta se guarda en `alerts_log` con fecha, KPI, región, valor, valor esperado, severidad y mensaje.
-5. **Envío:** correo (SMTP) y Slack (webhook). En **modo demo** no envía nada: escribe los correos en `outbox/`
-   para que se puedan ver.
-6. **Ejecución programada:** comando `bi run-daily` (para cron o GitHub Actions programado).
+1. Para cada KPI × región se arma una serie diaria (o semanal para KPIs de bajo volumen).
+2. **Método robusto:** puntuación z con mediana móvil y MAD en ventana de 28 días, ajustada por día de la semana.
+   Marca anomalía si |z| > 3.5. Resiste valores extremos, a diferencia de media y desviación estándar.
+3. **Reglas de negocio:** además compara contra los umbrales de `kpis.yaml`.
+4. Cada alerta se guarda en `alerts_log`: fecha, KPI, región, valor, esperado, severidad y mensaje.
+5. **Envío:** correo (SMTP) y Slack (webhook). En **modo demo** escribe los correos en `outbox/`.
+6. **Modo "replay":** `bi replay --from 2017-01-01` recorre la historia día por día como si fuera en vivo, para
+   demostrar qué alertas habrían llegado y cuándo.
 
-**Criterio de éxito:** el detector encuentra las 4 anomalías sembradas (A1–A4) y genera pocas falsas alarmas
-(objetivo: ≤ 1 por KPI por mes). Esto queda como prueba automática.
+**Eventos reales que esperamos que el detector encuentre** (se confirman con los datos en la Fase 1):
+
+| Evento | Fecha | KPI esperado |
+|---|---|---|
+| Black Friday | 24-nov-2017 | Pico de pedidos y ventas |
+| Huelga nacional de transportistas en Brasil | ~21–31 may-2018 | Caída de OTD, aumento de días de entrega y de reseñas negativas |
+| Fin abrupto de los datos | sep–oct 2018 | Debe marcarse como **periodo incompleto** (calidad), no como "caída de ventas" |
+
+**Criterio de éxito:** detecta los dos primeros eventos, clasifica bien el tercero y genera pocas falsas alarmas
+(objetivo: ≤ 1 por KPI por mes). Queda como prueba automática.
 
 ---
 
 ## 7. Calidad y gobernanza de datos
 
-Pruebas que corren en cada carga, antes de llegar a los marts:
+Con datos reales, los problemas de calidad **no se inventan: se encuentran**. Esperamos (y se confirma al cargar):
 
-| Tipo | Ejemplo |
+| Prueba | Problema real que esperamos encontrar |
 |---|---|
-| No nulos | `order_id`, `sku`, `date` nunca vacíos |
-| Unicidad | `order_line_id` único |
-| Valores aceptados | `channel` ∈ {Tienda física, E-commerce, Mayoreo} |
-| Integridad referencial | Todo `sku` de ventas existe en el catálogo |
-| Rangos | `quantity` > 0, descuento ≤ precio, fechas no futuras |
-| Frescura | Último dato ≤ 1 día de antigüedad |
-| Conciliación | Σ ventas en marts = Σ ventas en raw (sin pérdida ni duplicados) |
+| Consistencia de estatus | Pedidos "entregados" sin fecha de entrega |
+| Orden de fechas | Entrega antes que la compra o aprobación |
+| Valores faltantes | Productos sin categoría o sin medidas |
+| Cobertura de traducción | Categorías sin traducción en la tabla oficial |
+| Unicidad | Reseñas con `review_id` repetido; códigos postales duplicados en geolocalización |
+| Conciliación | Σ pagos ≠ Σ (precio + flete) en algunos pedidos |
+| Normalización | Mismas ciudades escritas distinto (acentos, mayúsculas) |
+| Frescura / completitud | Meses finales con muy pocos pedidos |
+| Conciliación del pipeline | Σ ventas en marts = Σ ventas en raw válidas (sin pérdida ni duplicados) |
 
-- Las filas que fallan van a **cuarentena** con el motivo, no se pierden ni contaminan los KPIs.
-- El generador mete **errores a propósito** (~0.5 %: SKUs inexistentes, cantidades negativas, duplicados) para
-  demostrar que se detectan.
-- La página "Calidad de datos" del dashboard muestra el resultado de la última carga.
+- Las filas que fallan van a **cuarentena** con el motivo; no se pierden ni contaminan los KPIs.
+- Se genera un **reporte de calidad** con el conteo de cada problema; aparece en el dashboard.
 
 ---
 
@@ -249,56 +294,56 @@ Pruebas que corren en cada carga, antes de llegar a los marts:
 | Usuario | Rol | Ve |
 |---|---|---|
 | `direccion` | Director | Todo |
-| `gerente.norte` | Gerente regional | Solo Norte |
-| `gerente.sur` | Gerente regional | Solo Sur |
-| `analista` | Analista | Todo, sin costos ni margen |
+| `gerente.sudeste` | Gerente regional | Solo pedidos de clientes del Sudeste (SP, RJ, MG, ES) |
+| `gerente.nordeste` | Gerente regional | Solo Nordeste |
+| `analista` | Analista | Todo, sin datos a nivel cliente individual |
+| `vendedor.<id>` | Vendedor (portal de seller) | Solo sus propios pedidos, ventas y reseñas |
 
-- El filtro se aplica en la **capa de consultas** (cada consulta pasa por `secure_query(user, …)`), así que no se
-  puede saltar desde la interfaz.
-- Pruebas automáticas: `gerente.norte` nunca recibe filas de otra región; `analista` nunca recibe columnas de costo.
+- El filtro se aplica en la **capa de consultas** (`secure_query(user, …)`), no solo en la interfaz.
+- Pruebas automáticas: un gerente nunca recibe filas de otra región; un vendedor nunca ve datos de otro vendedor.
 - Se exporta `rls_rules.csv` en el formato de *dataset de permisos* que usa Quick Suite/QuickSight.
 
 ---
 
 ## 9. Dashboard (boceto)
 
-Selector de usuario arriba (demo de RLS) + filtros globales: rango de fechas, región, canal, categoría.
+Selector de usuario arriba (demo de RLS) + filtros globales: fechas, región, estado, categoría, moneda.
+*(Los números del boceto son ilustrativos.)*
 
 **Página 1 — Resumen ejecutivo**
 ```
 ┌──────────────────────────────────────────────────────────────────────┐
-│ Usuario: [direccion ▼]   Fechas: [2026-01-01 → 2026-09-30]  Región ▼  │
+│ Usuario: [direccion ▼]  Fechas: [2017-01 → 2018-08]  Región ▼  MXN ▼  │
 ├──────────────┬──────────────┬──────────────┬──────────────┬──────────┤
-│ Ventas netas │ Cumpl. meta  │ Margen bruto │ OTD          │ Devol.   │
-│ $48.2 M      │ 97.4 %  ▼    │ 29.1 %  ▲    │ 93.8 %  ▼    │ 2.6 %    │
-│ +6.1 % a/a   │ meta 100 %   │ meta 28 %    │ meta 95 %    │ meta 3 % │
+│ Ventas       │ Cumpl. meta  │ Pedidos      │ OTD          │ Calif.   │
+│ $ —— M       │ —— %   ▼     │ ——           │ —— %   ▼     │ —— ★     │
+│ vs. año ant. │ meta 100 %   │ ticket $——   │ meta 90 %    │ meta 4.0 │
 ├──────────────┴──────────────┴──────────────┴──────────────┴──────────┤
-│  Ventas netas vs. meta (línea mensual)                                │
-│  ───────╱╲────╱───── · · · meta                                       │
+│  Ventas mensuales vs. meta (línea)          ▲ Black Friday 2017       │
 ├───────────────────────────────────┬──────────────────────────────────┤
-│ Ventas por región (barras)        │ Alertas activas (3)               │
-│ ███████ Centro                    │ 🔴 OTD Occidente 81 % (meta 95 %) │
-│ █████ Norte                       │ 🟠 Devoluciones Limpieza 7.9 %    │
-│ ████ Occidente                    │ 🟡 Ventas e-commerce Sur −62 %    │
-│ ███ Sur                           │                                   │
+│ Ventas por región (barras)        │ Alertas (ejemplo)                 │
+│ ███████████ Sudeste               │ 🔴 OTD Nordeste cae a ——%         │
+│ ████ Sul                          │ 🟠 Reseñas negativas suben ——%    │
+│ ███ Nordeste                      │ 🟡 Días de entrega +—— vs normal  │
+│ ██ Centro-Oeste  █ Norte          │                                   │
 ├───────────────────────────────────┴──────────────────────────────────┤
-│ 📝 Lectura: "Las ventas crecen 6 % anual, pero el cumplimiento de     │
-│ meta cae por Occidente, afectado por retrasos de entrega…"            │
+│ 📝 Lectura: "Las ventas crecen ——% anual impulsadas por el Sudeste.   │
+│ En mayo 2018 la puntualidad cayó por la huelga de transportistas…"    │
 └──────────────────────────────────────────────────────────────────────┘
 ```
 
-**Página 2 — Ventas:** tendencia diaria/semanal/mensual, desglose región → estado, canal, categoría → marca,
-top 10 productos y clientes, mapa de calor día × semana.
+**Página 2 — Ventas:** tendencia, desglose región → estado, categorías, top vendedores, métodos de pago y mensualidades,
+mapa por estado.
 
-**Página 3 — Operaciones:** OTD por región y semana, días de retraso promedio, tasa de devolución por categoría y marca.
+**Página 3 — Operación y satisfacción:** OTD y días de entrega por región, flete %, cancelaciones, calificación,
+y la gráfica **retraso vs. calificación**.
 
-**Página 4 — Alertas y anomalías:** tabla de alertas con filtros y gráfica de cada serie con los puntos anómalos marcados
-y la banda esperada.
+**Página 4 — Alertas y anomalías:** tabla de alertas con filtros y gráfica de cada serie con los puntos anómalos y la
+banda esperada.
 
-**Página 5 — Calidad de datos:** resultado de cada prueba (✅/❌), filas en cuarentena y motivo, frescura de cada fuente,
-tiempos de carga.
+**Página 5 — Calidad de datos:** resultado de cada prueba (✅/❌), filas en cuarentena y motivo, completitud por mes.
 
-**Idioma:** interfaz en **español** (la vacante es en español y en CDMX). README bilingüe.
+**Idioma:** interfaz en **español** (categorías traducidas al español). README bilingüe.
 
 ---
 
@@ -308,17 +353,18 @@ tiempos de carga.
 01-bi-kpi-analytics/
 ├── README.md                  # Bilingüe: problema, demo, capturas, vacante → solución
 ├── pyproject.toml
-├── Makefile                   # make demo | make test | make dashboard
+├── Makefile                   # make data | make demo | make test | make dashboard
 ├── config/
 │   ├── kpis.yaml
 │   ├── users.yaml
+│   ├── targets.yaml
 │   └── sources.yaml
 ├── sql/
 │   ├── staging/               # limpieza y tipado
 │   └── marts/                 # dimensiones, hechos, agregados
 ├── src/bi_kpi/
-│   ├── generate/              # datos sintéticos + anomalías sembradas
-│   ├── extract/               # SQLite, CSV/Excel, API
+│   ├── download/              # Kaggle API o ZIP local
+│   ├── extract/               # SQLite (SQL), CSV, API
 │   ├── transform/             # ejecuta los SQL en orden
 │   ├── quality/               # pruebas de calidad + cuarentena
 │   ├── kpis/                  # motor de KPIs desde YAML
@@ -326,9 +372,10 @@ tiempos de carga.
 │   ├── alerts/                # correo, Slack, outbox
 │   ├── security/              # RLS
 │   ├── dashboard/             # app Streamlit
-│   └── cli.py                 # bi generate | bi load | bi run-daily | bi dashboard
+│   └── cli.py                 # bi download | bi load | bi run-daily | bi replay | bi dashboard
 ├── scripts/benchmark.py
 ├── tests/
+│   ├── fixtures/              # mini-dataset hecho a mano con el esquema de Olist
 │   ├── unit/
 │   ├── data_quality/
 │   ├── integration/
@@ -338,10 +385,10 @@ tiempos de carga.
 │   ├── user-guide.md          # capacitación a usuarios finales
 │   ├── quicksuite.md          # guía de migración a AWS
 │   └── screenshots/
-└── data/                      # generado, ignorado por git (salvo fixtures pequeños)
+└── data/                      # descargado, ignorado por git
 ```
 
-**Para correrlo:** `make demo` → genera datos, carga, valida, calcula KPIs, detecta anomalías y abre el dashboard.
+**Para correrlo:** `make data` (descarga Olist) → `make demo` (carga, valida, calcula KPIs, detecta anomalías y abre el dashboard).
 
 ---
 
@@ -349,13 +396,14 @@ tiempos de carga.
 
 | Nivel | Qué verifica | Ejemplo |
 |---|---|---|
-| Unitarias | Cada función y cada KPI con datos conocidos | Margen de 3 líneas inventadas = 25.00 % exacto |
-| Calidad de datos | El pipeline rechaza lo inválido | SKU inexistente termina en cuarentena |
-| Integración | Pipeline completo con un set pequeño | Σ ventas raw = Σ ventas marts; se detectan A1–A4 |
-| Seguridad | RLS no tiene fugas | `gerente.norte` → 0 filas de Sur |
-| E2E (navegador) | El dashboard carga y responde | Cambiar filtro de región actualiza las tarjetas; capturas automáticas |
-| Rendimiento | Las consultas del dashboard son rápidas | Página principal < 1 s con agregados |
-| CI | Todo lo anterior en cada push | GitHub Actions + insignia ✅ en el README |
+| Unitarias | Cada función y cada KPI con datos conocidos | OTD de 4 pedidos inventados (3 a tiempo) = 75.00 % exacto |
+| Calidad de datos | El pipeline detecta y aísla lo inválido | Pedido "entregado" sin fecha termina en cuarentena |
+| Integración | Pipeline completo con el *fixture* | Σ ventas raw válidas = Σ ventas marts |
+| Datos reales | Pipeline completo con Olist (local, no en CI) | Se detectan Black Friday y la huelga de mayo 2018 |
+| Seguridad | RLS sin fugas | `gerente.sudeste` → 0 filas de otras regiones |
+| E2E (navegador) | El dashboard carga y responde | Cambiar región actualiza las tarjetas; capturas automáticas |
+| Rendimiento | Consultas del dashboard rápidas | Página principal < 1 s con agregados |
+| CI | Todo lo que no requiere el dataset completo, en cada push | GitHub Actions + insignia ✅ en el README |
 
 ---
 
@@ -363,11 +411,11 @@ tiempos de carga.
 
 | Paso | Entregable | Revisión |
 |---|---|---|
-| 1 | Generador de datos + extracción de 3 fuentes + staging + modelo estrella | Pruebas de integración |
-| 2 | Pruebas de calidad + cuarentena | Pruebas de datos |
-| 3 | Motor de KPIs + RLS | Pruebas unitarias y de seguridad |
+| 1 | Descarga + extracción de 3 fuentes + staging + modelo estrella | Pruebas de integración |
+| 2 | Pruebas de calidad + cuarentena + reporte | Pruebas de datos |
+| 3 | Motor de KPIs + metas + RLS | Pruebas unitarias y de seguridad |
 | 4 | Dashboard (5 páginas) | E2E + capturas → **revisión tuya** |
-| 5 | Anomalías + alertas + `run-daily` | Debe detectar A1–A4 |
+| 5 | Anomalías + alertas + `run-daily` + `replay` | Debe detectar los eventos reales |
 | 6 | Benchmark, CI, user guide, guía Quick Suite, README final | **Revisión tuya** → Pull Request |
 
 ---
@@ -376,10 +424,9 @@ tiempos de carga.
 
 - Cuenta real de AWS / Quick Suite (se documenta la migración; opcional al final con la prueba gratuita).
 - Autenticación real con contraseñas (el selector de usuario es para demostrar RLS).
-- Datos reales de empresas.
+- Análisis de texto de las reseñas (están en portugués; posible extensión futura).
 
-## 14. Preguntas para ti
+## 14. Atribución
 
-1. ¿Te gusta el caso de **Distribuidora Nova** (consumo masivo) o prefieres otra industria (ej. retail, logística, salud)?
-2. ¿Interfaz en **español** con README bilingüe, como propongo?
-3. ¿Algún KPI que quieras agregar o quitar?
+Datos: *Brazilian E-Commerce Public Dataset by Olist*, publicado en Kaggle bajo licencia CC BY-NC-SA 4.0.
+Este proyecto no está afiliado a Olist.
