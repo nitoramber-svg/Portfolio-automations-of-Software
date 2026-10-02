@@ -1,4 +1,4 @@
-.PHONY: install sample data load test lint
+.PHONY: install sample data load quality test lint
 
 install:
 	pip install -e ".[dev]"
@@ -11,6 +11,9 @@ data:            ## Real Olist data (Kaggle API or ZIP=path/to/archive.zip)
 
 load:            ## Extract the 3 sources, build staging and the star schema
 	bi load
+
+quality:         ## Report of every data quality check and the reconciliation
+	bi quality
 
 test:
 	pytest

@@ -1,4 +1,4 @@
-"""End-to-end load: extract the three sources, then build staging and the star schema."""
+"""End-to-end load: extract the three sources, build staging, check quality, build the marts."""
 
 from __future__ import annotations
 
@@ -8,6 +8,7 @@ from datetime import date
 
 import duckdb
 
+from bi_kpi import quality
 from bi_kpi.config import Settings
 from bi_kpi.extract import files, fx, oltp
 from bi_kpi.olist import FILE_TABLES, FILES, OPTIONAL_TABLES
@@ -21,6 +22,7 @@ class LoadReport:
     extracted: dict[str, int] = field(default_factory=dict)
     fx_source: str = ""
     sql_files: list[str] = field(default_factory=list)
+    quarantined: dict[str, int] = field(default_factory=dict)
     marts: dict[str, int] = field(default_factory=dict)
 
 
@@ -46,7 +48,8 @@ def load(settings: Settings, offline_fx: bool = False, since: str | None = None)
         report.extracted.update(oltp.extract_oltp(con, settings.oltp_db, since=since))
         for table in FILE_TABLES:
             if table in OPTIONAL_TABLES and not (settings.raw_dir / FILES[table][0]).exists():
-                log.info("optional source %s not present; skipped", table)
+                log.info("optional source %s not present; left empty", table)
+                files.create_empty(con, table)
                 continue
             report.extracted[table] = files.load_csv(con, table, settings.raw_dir)
 
@@ -55,7 +58,10 @@ def load(settings: Settings, offline_fx: bool = False, since: str | None = None)
         report.extracted["fx_rates"] = fx.load_rates(con, rates)
         report.fx_source = str(rates["fx_source"].iloc[0])
 
-        report.sql_files = run_sql(con, settings.sql_dir)
+        report.sql_files = run_sql(con, settings.sql_dir, ("staging",))
+        report.quarantined = quality.run(con)
+        report.sql_files += run_sql(con, settings.sql_dir, ("marts",))
+        quality.reconcile(con)
         for (table,) in con.execute(
             "SELECT table_name FROM information_schema.tables "
             "WHERE table_schema = 'mart' ORDER BY table_name"

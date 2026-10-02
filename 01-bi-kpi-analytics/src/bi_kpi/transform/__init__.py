@@ -1,4 +1,7 @@
-"""Run the versioned SQL files (staging, then marts) against the warehouse."""
+"""Run the versioned SQL files (staging, then marts) against the warehouse.
+
+The pipeline runs the layers separately so the quality checks can sit between them.
+"""
 
 from __future__ import annotations
 
@@ -6,7 +9,7 @@ from pathlib import Path
 
 import duckdb
 
-SCHEMAS = ("raw", "seed", "stg", "mart")
+SCHEMAS = ("raw", "seed", "stg", "quality", "quarantine", "mart")
 LAYERS = ("staging", "marts")
 
 
@@ -28,13 +31,15 @@ def load_seeds(con: duckdb.DuckDBPyConnection, seeds_dir: Path) -> list[str]:
     return names
 
 
-def sql_files(sql_dir: Path) -> list[Path]:
-    return [p for layer in LAYERS for p in sorted((sql_dir / layer).glob("*.sql"))]
+def sql_files(sql_dir: Path, layers: tuple[str, ...] = LAYERS) -> list[Path]:
+    return [p for layer in layers for p in sorted((sql_dir / layer).glob("*.sql"))]
 
 
-def run_sql(con: duckdb.DuckDBPyConnection, sql_dir: Path) -> list[str]:
+def run_sql(
+    con: duckdb.DuckDBPyConnection, sql_dir: Path, layers: tuple[str, ...] = LAYERS
+) -> list[str]:
     ran = []
-    for path in sql_files(sql_dir):
+    for path in sql_files(sql_dir, layers):
         try:
             con.execute(path.read_text(encoding="utf-8"))
         except duckdb.Error as exc:

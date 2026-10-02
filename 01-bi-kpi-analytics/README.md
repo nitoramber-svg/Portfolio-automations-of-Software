@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/nitoramber-svg/Portfolio-automations-of-Software/actions/workflows/bi-kpi-analytics.yml/badge.svg)](https://github.com/nitoramber-svg/Portfolio-automations-of-Software/actions/workflows/bi-kpi-analytics.yml)
 
-> 🚧 **Work in progress** — step 1 of 6 done (sources → staging → star schema). See the [design](docs/design.md).
+> 🚧 **Work in progress** — steps 1–2 of 6 done (sources → staging → quality → star schema). See the [design](docs/design.md).
 
 An end-to-end Business Intelligence pipeline built on **real, public data from Olist**, a Brazilian
 e-commerce marketplace (~100k orders, 2016–2018). It targets the day-to-day of a BI / Data Analyst role:
@@ -19,7 +19,7 @@ real de Analista de BI (Amazon Quick Suite, SQL, AWS). Ver el [diseño](docs/des
 | Staging layer: typing, de-duplication, city normalization, category translation to Spanish | ✅ |
 | Star schema: 6 dimensions, 3 fact tables, daily aggregate, BRL → MXN/USD conversion | ✅ |
 | Tests on a hand-made fixture with known answers + CI | ✅ |
-| Data quality checks and quarantine | ⏳ step 2 |
+| Data quality: 30 checks, quarantine of self-contradicting rows, report, and a reconciliation that refuses to publish marts that lost data — [what the real data showed](docs/data-quality.md) | ✅ |
 | KPI engine, targets, row-level security | ⏳ step 3 |
 | Dashboard | ⏳ step 4 |
 | Anomaly detection, alerts, event calendar, early warning | ⏳ step 5 |
@@ -36,7 +36,8 @@ bi sample
 bi download                           # needs KAGGLE_USERNAME / KAGGLE_KEY
 bi download --zip path/to/archive.zip # or the ZIP downloaded from Kaggle
 
-bi load      # extract → staging → star schema  (add --offline to skip the FX API)
+bi load      # extract → staging → quality → star schema  (add --offline to skip the FX API)
+bi quality   # every check: rows flagged, % and value of the affected orders
 pytest
 ```
 
@@ -44,8 +45,8 @@ pytest
 
 ```
 SQLite (orders, payments) ─┐
-CSV files (catalog, ...)  ─┼─► raw ─► stg ─► mart (star schema) ─► KPIs ─► dashboard / alerts
-FX API (BRL→MXN/USD)      ─┘                DuckDB
+CSV files (catalog, ...)  ─┼─► raw ─► stg ─► quality ─► mart (star schema) ─► KPIs ─► dashboard / alerts
+FX API (BRL→MXN/USD)      ─┘                    └─► quarantine     DuckDB
 ```
 
 Transformations are plain, versioned SQL in [`sql/`](sql/), run in order by the pipeline.

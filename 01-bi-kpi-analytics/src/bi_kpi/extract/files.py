@@ -34,3 +34,13 @@ def load_csv(con: duckdb.DuckDBPyConnection, table: str, raw_dir: Path) -> int:
         [str(path)],
     )
     return con.execute(f"SELECT count(*) FROM raw.{table}").fetchone()[0]
+
+
+def create_empty(con: duckdb.DuckDBPyConnection, table: str) -> None:
+    """An absent optional source still exists as an empty ``raw.<table>`` so the SQL can join it.
+
+    Replacing it also drops rows left by an earlier load that had the file.
+    """
+    _, required = FILES[table]
+    cols = ", ".join(f'"{c}" VARCHAR' for c in required)
+    con.execute(f"CREATE OR REPLACE TABLE raw.{table} ({cols})")

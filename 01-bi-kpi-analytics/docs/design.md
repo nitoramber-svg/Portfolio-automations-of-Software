@@ -1,6 +1,6 @@
 # Fase 0 — Diseño: BI & KPI Analytics (datos reales de Olist)
 
-> **Estado:** borrador v2 para aprobación. No hay código todavía.
+> **Estado:** aprobado; pasos 1–2 hechos. Lo que la medición cambió del plan está en [data-quality.md](data-quality.md).
 > **Vacante de referencia:** Analista de QuickSuite (BI) — CDMX, remoto híbrido, $55k–62k MXN/mes.
 > **Alcance:** 100 % local y gratuito. Guía para migrar a AWS/Amazon Quick Suite al final.
 > **Datos:** reales y públicos — *Brazilian E-Commerce Public Dataset by Olist*.
@@ -316,7 +316,11 @@ X pedidos tardíos y bajó la calificación Y puntos". Sirve para planear el sig
 
 ## 7. Calidad y gobernanza de datos
 
-Con datos reales, los problemas de calidad **no se inventan: se encuentran**. Esperamos (y se confirma al cargar):
+> **Medido (paso 2):** la lista de abajo era la expectativa. Varios no existen, la conciliación de pagos
+> se explica casi toda (sin productos e intereses), el problema de ciudades está en vendedores y no en clientes,
+> y apareció uno no previsto (estado del vendedor ≠ estado de su CP). Resultados en [data-quality.md](data-quality.md).
+
+Con datos reales, los problemas de calidad **no se inventan: se encuentran**. Esperábamos:
 
 | Prueba | Problema real que esperamos encontrar |
 |---|---|
