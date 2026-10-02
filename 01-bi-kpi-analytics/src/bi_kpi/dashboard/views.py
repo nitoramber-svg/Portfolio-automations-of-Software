@@ -135,6 +135,18 @@ def anomaly_series(view: View, series: str, region: str) -> pd.DataFrame:
 
 
 @st.cache_data(show_spinner=False)
+def event_calendar() -> pd.DataFrame:
+    with db() as con:
+        return data.event_calendar(con)
+
+
+@st.cache_data(show_spinner=False)
+def event_impact(user: security.User) -> pd.DataFrame:
+    with db() as con:
+        return data.event_impact(con, user)
+
+
+@st.cache_data(show_spinner=False)
 def alert_regions(user: security.User) -> list[str]:
     with db() as con:
         return data.alert_regions_for(con, user)
@@ -628,14 +640,18 @@ def page_operations(view: View) -> None:
 def page_alerts(view: View) -> None:
     st.title("Alertas")
     banner(view)
-    anomalies_tab, targets_tab = st.tabs(["Anomalías", "Contra la meta"])
+    anomalies_tab, events_tab, targets_tab = st.tabs(["Anomalías", "Eventos", "Contra la meta"])
     with anomalies_tab:
         anomaly_section(view)
+    with events_tab:
+        events_section(view)
     with targets_tab:
         target_section(view)
 
 
 SERIES_LABELS = {
+    "carrier_pickups": "⏱ Despachos a paquetería (alerta temprana)",
+    "late_dispatch": "⏱ Despachos atrasados (alerta temprana)",
     "orders": "Pedidos (por fecha de compra)",
     "gmv": "Ventas (por semana de compra)",
     "on_time_delivery": "Entregas a tiempo (por fecha en que debían llegar)",
@@ -681,6 +697,8 @@ def anomaly_section(view: View) -> None:
             "gmv": "currency",
             "on_time_delivery": "ratio",
             "negative_reviews": "ratio",
+            "carrier_pickups": "count",
+            "late_dispatch": "ratio",
         }[series_id]
         fig = go.Figure()
         band = df.dropna(subset=["low", "high"])
@@ -732,10 +750,38 @@ def anomaly_section(view: View) -> None:
                 line_width=0,
                 annotation_text="datos incompletos",
             )
+        # Registered events: planned in blue, unplanned in orange (config/events.yaml).
+        shown = df["date"]
+        for ev in event_calendar().itertuples():
+            lo, hi = pd.Timestamp(ev.start), pd.Timestamp(ev.end)
+            if len(shown) and hi >= shown.min() and lo <= shown.max():
+                fig.add_vrect(
+                    x0=lo,
+                    x1=hi,
+                    line_width=0,
+                    opacity=0.18,
+                    fillcolor="#93c5fd" if ev.kind == "planned" else "#fdba74",
+                )  # unlabeled: back-to-back events' labels overlap; the caption names them
+        planned_pts = df[df["status"] == "planned"]
+        if len(planned_pts):
+            fig.add_scatter(
+                x=planned_pts["date"],
+                y=planned_pts["value"],
+                mode="markers",
+                name="Esperado por un evento planeado",
+                marker=dict(color="#60a5fa", size=8, symbol="diamond"),
+            )
         if unit == "ratio":
             fig.update_yaxes(tickformat=".0%")
         fig.update_layout(title=f"{SERIES_LABELS[series_id]} · {region}")
         chart(fig, 380)
+        cal = event_calendar()
+        planned = ", ".join(cal.loc[cal["kind"] == "planned", "name"])
+        unplanned = ", ".join(cal.loc[cal["kind"] == "unplanned", "name"])
+        st.caption(
+            f"Bandas azules — eventos planeados: {planned or 'ninguno'}. Naranjas — no planeados: "
+            f"{unplanned or 'ninguno'}. Gris: datos incompletos. Detalle en la pestaña Eventos."
+        )
 
     if len(sent):
         st.markdown("##### Alertas enviadas (más recientes primero)")
@@ -745,6 +791,9 @@ def anomaly_section(view: View) -> None:
                     "Enviada": pd.to_datetime(sent["sent_on"]).dt.strftime("%d/%m/%Y"),
                     "": sent["severity"].map({"critical": "🔴", "warning": "🟠"}),
                     "Alerta": sent["subject"].str.replace("[BI] ", "", regex=False).str[2:],
+                    "Responsable": sent["owner"].fillna(""),
+                    "En riesgo": sent["at_risk"].map(lambda n: "" if pd.isna(n) else f"{n:,.0f}"),
+                    "Evento": sent["event"].fillna(""),
                     "Para": sent["recipients"].map(lambda r: ", ".join(r)),
                 }
             ),
@@ -754,6 +803,69 @@ def anomaly_section(view: View) -> None:
         )
     else:
         st.success("Sin alertas de anomalías en la selección.")
+
+
+def events_section(view: View) -> None:
+    st.caption(
+        "Calendario de eventos (config/events.yaml). Un evento planeado no alerta por lo que se "
+        "espera de él (el pico del Black Friday) pero sí por lo demás; uno no planeado se "
+        "registra al confirmar una alerta y queda fuera de la línea base mientras dura."
+    )
+    cal = event_calendar()
+    if cal.empty:
+        st.info("No hay eventos registrados.")
+        return
+    kinds = {"planned": "Planeado", "unplanned": "No planeado"}
+    if view.user.role not in data.QUALITY_ROLES:
+        st.dataframe(
+            pd.DataFrame(
+                {
+                    "Evento": cal["name"],
+                    "Tipo": cal["kind"].map(kinds),
+                    "Del": pd.to_datetime(cal["start"]).dt.strftime("%d/%m/%Y"),
+                    "Al": pd.to_datetime(cal["end"]).dt.strftime("%d/%m/%Y"),
+                }
+            ),
+            hide_index=True,
+            width="stretch",
+        )
+        st.caption("El análisis de impacto es nacional: lo ven dirección y analistas.")
+        return
+    imp = event_impact(view.user)
+
+    def pct(x):
+        return "" if pd.isna(x) else f"{x:+.0%}"
+
+    st.markdown("##### Qué costó cada evento (Brasil, contra lo que el detector esperaba)")
+    st.dataframe(
+        pd.DataFrame(
+            {
+                "Evento": imp["event"],
+                "Tipo": imp["kind"].map(kinds),
+                "Del": pd.to_datetime(imp["start"]).dt.strftime("%d/%m/%Y"),
+                "Al": pd.to_datetime(imp["end"]).dt.strftime("%d/%m/%Y"),
+                "Pedidos": imp["orders_delta_pct"].map(pct),
+                "Despachos": imp["pickups_delta_pct"].map(pct),
+                "Entregas tarde extra": imp["late_orders_extra"].map(
+                    lambda x: "" if pd.isna(x) else f"{x:,.0f}"
+                ),
+                "Calificación": [
+                    "" if pd.isna(a) or pd.isna(b) else f"{a:.2f} → {b:.2f}"
+                    for a, b in zip(imp["score_before"], imp["score_during"], strict=True)
+                ],
+            }
+        ),
+        hide_index=True,
+        width="stretch",
+    )
+    st.caption(
+        "Pedidos y despachos: durante el evento. Entregas tarde: pedidos que vencían del inicio "
+        "hasta 14 días después del fin, contra la puntualidad esperada. Calificación: 8 semanas "
+        "antes contra el evento y sus 14 días posteriores."
+    )
+    notes = cal[cal["note"].fillna("") != ""]
+    for ev in notes.itertuples():
+        st.markdown(f"**{ev.name}.** {ev.note}")
 
 
 def target_section(view: View) -> None:

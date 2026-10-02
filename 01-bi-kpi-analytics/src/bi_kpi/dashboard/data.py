@@ -352,5 +352,26 @@ def alert_regions_for(con, user: User) -> list[str]:
     ]
 
 
+def event_calendar(con) -> pd.DataFrame:
+    """The registered events (public: dates and names, no figures)."""
+    exists = con.execute(
+        "SELECT count(*) FROM information_schema.tables "
+        "WHERE table_schema = 'alerts' AND table_name = 'events'"
+    ).fetchone()[0]
+    if not exists:
+        return pd.DataFrame(columns=["name", "kind", "start", "end", "note"])
+    return con.execute(
+        'SELECT name, kind, start, "end", note FROM alerts.events ORDER BY start'
+    ).df()
+
+
+def event_impact(con, user: User) -> pd.DataFrame:
+    """What each event cost, nationally: like the quality report, director and analyst only."""
+    from bi_kpi.events import impact
+
+    _require_quality_role(user)
+    return impact(con)
+
+
 def connect(path) -> duckdb.DuckDBPyConnection:
     return duckdb.connect(str(path), read_only=True)

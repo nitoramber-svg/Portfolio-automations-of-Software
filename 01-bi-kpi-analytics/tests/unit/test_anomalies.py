@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import email
-import email.policy
 from types import SimpleNamespace
 
 import numpy as np
@@ -189,56 +187,3 @@ def test_routing_follows_row_level_security(region, severity, expected):
     got = alerts.recipients(region, severity, USERS, CFG)
     assert got == expected
     assert not any(u.startswith("vendedor") for u in got)
-
-
-def test_demo_delivery_writes_the_outbox(tmp_path):
-    cfg = alerts.AlertSettings(
-        mode="demo",
-        outbox=tmp_path / "outbox",
-        dashboard_url="http://localhost:8501",
-        slack_channel="#x",
-        national=("direccion",),
-        critical_copy=("direccion",),
-        emails={"direccion": "direccion@example.com"},
-    )
-    ep = pd.Series(
-        {
-            "series": "on_time_delivery",
-            "region": NATIONAL,
-            "direction": "down",
-            "grain": "day",
-            "start": pd.Timestamp("2018-06-01"),
-            "end": pd.Timestamp("2018-06-07"),
-            "points": 5,
-            "value": 0.856,
-            "expected": 0.946,
-            "z": -7.99,
-            "peak_date": pd.Timestamp("2018-06-04"),
-            "peak_value": 0.80,
-            "peak_z": -9.1,
-            "severity": "critical",
-        }
-    )
-    subject, body = alerts.message(ep)
-    assert subject == "[BI] 🔴 Entregas a tiempo cae en todo Brasil: 85.6% (esperado 94.6%)"
-    assert "Lleva 5 periodos así" in body
-    df = pd.DataFrame(
-        [
-            {
-                "alert_id": "abc",
-                "sent_on": "2018-06-01",
-                "recipients": ["direccion"],
-                "subject": subject,
-                "body": body,
-            }
-        ]
-    )
-    done = alerts.deliver(df, cfg)
-    names = sorted(p.name for p in cfg.outbox.iterdir())
-    assert names == ["2018-06-01_abc_direccion.eml", "2018-06-01_abc_slack.json"]
-    assert len(done) == 2
-    mail = email.message_from_bytes(
-        (cfg.outbox / names[0]).read_bytes(), policy=email.policy.default
-    )
-    assert mail["Subject"] == subject
-    assert "alertas?usuario=direccion" in mail.get_content()

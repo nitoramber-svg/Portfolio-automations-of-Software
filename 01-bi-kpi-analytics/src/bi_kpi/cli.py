@@ -17,7 +17,7 @@ from pathlib import Path
 import duckdb
 import pandas as pd
 
-from bi_kpi import alerts, kpis, pipeline, quality, sample, security
+from bi_kpi import alerts, events, kpis, pipeline, quality, sample, security
 from bi_kpi.config import load_settings
 from bi_kpi.download import DownloadError, download_from_kaggle, extract_zip
 
@@ -222,12 +222,13 @@ def _cmd_run_daily(args: argparse.Namespace) -> int:
             print(f"{day}: data incomplete after {cutoff} (end of the dataset) — no alerts")
             return 0
         todays = alerts.alerts_between(con, day, day)
+        risk = alerts.at_risk_for(con, todays["alert_id"].tolist())
     if todays.empty:
         print(f"{day}: no alerts")
         return 0
     print(f"{day}: {len(todays)} alert(s)")
     _print_alerts(todays)
-    for item in alerts.deliver(todays, cfg):
+    for item in alerts.deliver(todays, cfg, risk):
         print(f"  delivered: {item}")
     return 0
 
@@ -241,6 +242,7 @@ def _cmd_replay(args: argparse.Namespace) -> int:
     with duckdb.connect(str(settings.warehouse), read_only=True) as con:
         df = alerts.alerts_between(con, start, end)
         cutoff = con.execute("SELECT data_cutoff FROM alerts.meta").fetchone()[0]
+        risk = alerts.at_risk_for(con, df["alert_id"].tolist()) if args.deliver else {}
     print(f"{len(df)} alerts between {start or 'start'} and {end or 'end'}")
     _print_alerts(df)
     if cutoff is not None:
@@ -250,8 +252,41 @@ def _cmd_replay(args: argparse.Namespace) -> int:
         print("Alerts per month and KPI:")
         print(per_month.unstack(fill_value=0).to_string())
     if args.deliver:
-        done = alerts.deliver(df, cfg)
+        done = alerts.deliver(df, cfg, risk)
         print(f"Delivered {len(done)} messages ({cfg.mode} mode, {cfg.outbox})")
+    return 0
+
+
+def _cmd_impact(args: argparse.Namespace) -> int:
+    """What each registered event cost (config/events.yaml), against the detector's
+    expectation without it."""
+    settings = load_settings()
+    with duckdb.connect(str(settings.warehouse), read_only=True) as con:
+        df = events.impact(con)
+    if df.empty:
+        print("No events registered (config/events.yaml)")
+        return 0
+    kinds = {"planned": "planeado", "unplanned": "no planeado"}
+    for r in df.itertuples():
+        start, end = pd.Timestamp(r.start).date(), pd.Timestamp(r.end).date()
+        print(f"{r.event} ({kinds[r.kind]}, {start} → {end})")
+        if r.orders_expected:
+            print(
+                f"  pedidos: {r.orders:,.0f} vs {r.orders_expected:,.0f} esperados "
+                f"({r.orders_delta_pct:+.0%})"
+            )
+        if pd.notna(r.pickups_delta_pct):
+            print(f"  despachos a paquetería: {r.pickups_delta_pct:+.0%} vs lo esperado")
+        if r.deliveries_due:
+            print(
+                f"  entregas tardías extra: {r.late_orders_extra:,.0f} de "
+                f"{r.deliveries_due:,.0f} pedidos que vencían"
+            )
+        if r.score_before is not None and r.score_during is not None:
+            print(
+                f"  calificación: {r.score_before:.2f} → {r.score_during:.2f} "
+                f"({r.score_during - r.score_before:+.2f})"
+            )
     return 0
 
 
@@ -309,6 +344,9 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--to", dest="end", help="YYYY-MM-DD")
     p.add_argument("--deliver", action="store_true", help="also write/send them all")
     p.set_defaults(func=_cmd_replay)
+
+    p = sub.add_parser("impact", help="what each registered event cost (config/events.yaml)")
+    p.set_defaults(func=_cmd_impact)
 
     p = sub.add_parser("rls-export", help="write the RLS rules as a Quick Suite permissions file")
     p.add_argument("--out", default="data/rls_rules.csv")

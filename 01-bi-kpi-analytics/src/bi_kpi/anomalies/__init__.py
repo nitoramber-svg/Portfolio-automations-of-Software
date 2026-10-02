@@ -10,6 +10,14 @@ exactly what a live system would have seen:
     negative_reviews   review date, by week: reviews written on Sundays are 28 % negative and
                        on Mondays there are almost none, so days are not comparable
 
+and two leading indicators (design §6.1-B), which move before deliveries fail:
+
+    carrier_pickups    orders handed to the carrier per day. In the May 2018 strike they fell
+                       on the 24th; the alert went out on the 25th, seven days before the
+                       on-time delivery alert
+    late_dispatch      of the orders whose dispatch deadline is that day, the share not handed
+                       over by then
+
 Method (design §6): robust z-score = (value - median) / (1.4826 * MAD) over the previous N
 observations — observations, not calendar days, because the on-time series skips weekends. Counts
 are first divided by a weekday factor from the previous 8 weeks. |z| > 3.5 is an anomaly. A
@@ -17,7 +25,9 @@ group whose volume is too thin day to day (Norte) is evaluated by week instead.
 
 Nothing is flagged on incomplete data: incomplete months (step 2) and the dataset's tail, where
 volume fades out as the snapshot ends (``data_cutoff``), are reported once as "incomplete", not
-as a drop.
+as a drop. Nor on public holidays (no pickups on Corpus Christi is not news). Event days
+(config/events.yaml) are kept out of the baselines, and during a planned event the series it is
+expected to move are marked "planned", not alerted.
 """
 
 from __future__ import annotations
@@ -45,6 +55,7 @@ class Series:
     unit: str  # for messages: count | currency | ratio
     alert_on: str  # "both", "up" or "down": the direction that is bad news
     sql: str  # date, region, num, den  (den = volume; for counts den = orders)
+    leading: bool = False  # an early warning: it moves before the outcome KPIs do
 
 
 SERIES: tuple[Series, ...] = (
@@ -109,6 +120,40 @@ SERIES: tuple[Series, ...] = (
            JOIN mart.dim_customer c USING (customer_key)
            WHERE r.is_latest_for_order GROUP BY ALL""",
     ),
+    Series(
+        "carrier_pickups",
+        "Despachos a paquetería",
+        "count",
+        True,
+        "day",
+        28,
+        "count",
+        "down",
+        """SELECT CAST(o.shipped_at AS DATE) AS date, c.region, count(*) AS num, count(*) AS den
+           FROM mart.fact_orders o JOIN mart.dim_customer c USING (customer_key)
+           WHERE NOT o.is_canceled AND o.shipped_at IS NOT NULL GROUP BY ALL""",
+        leading=True,
+    ),
+    Series(
+        "late_dispatch",
+        "Despachos atrasados",
+        "ratio",
+        False,
+        "day",
+        20,
+        "ratio",
+        "up",
+        """WITH lim AS (SELECT order_id, CAST(min(shipping_limit_at) AS DATE) AS lim
+                     FROM stg.order_items GROUP BY 1)
+           SELECT l.lim AS date, c.region,
+                  count(*) FILTER (WHERE o.shipped_at IS NULL
+                                   OR CAST(o.shipped_at AS DATE) > l.lim) AS num,
+                  count(*) AS den
+           FROM mart.fact_orders o JOIN lim l USING (order_id)
+           JOIN mart.dim_customer c USING (customer_key)
+           WHERE NOT o.is_canceled GROUP BY ALL""",
+        leading=True,
+    ),
 )
 SERIES_BY_ID = {s.id: s for s in SERIES}
 
@@ -163,17 +208,24 @@ def build_series(con: duckdb.DuckDBPyConnection) -> pd.DataFrame:
 
 
 def _robust_z(
-    values: np.ndarray, window: int, floor: float
+    values: np.ndarray, window: int, floor: float, baseline: np.ndarray | None = None
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-    """z, expected value and scale of each point against the previous ``window`` points."""
+    """z, expected value and scale of each point against the last ``window`` *usable* points of
+    ``baseline`` (``values`` with event days blanked out; the point itself is still judged).
+
+    Usable points, not positions: blanking a month-long event out of a 20-point window would
+    otherwise leave no baseline at all, and the detector would go blind exactly during and right
+    after the events that matter. The search reaches back at most three windows.
+    """
+    baseline = values if baseline is None else baseline
     n = len(values)
     z = np.full(n, np.nan)
     expected = np.full(n, np.nan)
     scales = np.full(n, np.nan)
     min_obs = int(window * 0.75)
     for i in range(n):
-        past = values[max(0, i - window) : i]
-        past = past[~np.isnan(past)]
+        past = baseline[max(0, i - 3 * window) : i]
+        past = past[~np.isnan(past)][-window:]
         if len(past) < min_obs or np.isnan(values[i]):
             continue
         med = np.median(past)
@@ -203,11 +255,21 @@ def _weekday_factor(g: pd.DataFrame) -> np.ndarray:
     return f
 
 
-def detect(series: pd.DataFrame, complete: pd.Series) -> pd.DataFrame:
+def detect(
+    series: pd.DataFrame,
+    complete: pd.Series,
+    events: tuple = (),
+    holidays: frozenset = frozenset(),
+) -> pd.DataFrame:
     """Add expected, z and status to every point. ``complete``: date -> bool (data usable).
 
-    status: anomaly_up / anomaly_down / normal / thin (volume < MIN_VOLUME) / incomplete
+    status: anomaly_up / anomaly_down / normal / thin (volume < MIN_VOLUME) / incomplete /
+    holiday / planned (inside a planned event that is expected to move this series)
     """
+    from bi_kpi.events import event_days
+
+    planned_days = event_days(tuple(e for e in events if e.kind == "planned"))
+    unplanned_days = event_days(tuple(e for e in events if e.kind == "unplanned"))
     out = []
     for (sid, _region), g in series.groupby(["series", "region"], sort=False):
         s = SERIES_BY_ID[sid]
@@ -228,15 +290,58 @@ def detect(series: pd.DataFrame, complete: pd.Series) -> pd.DataFrame:
         adjusted = values / factor
         floor = 0.005 if s.kind == "ratio" else 1.0
         window = s.window if not week or s.grain == "week" else 8
-        z, expected, scale = _robust_z(adjusted, window, floor)
+        span = 7 if week else 1  # a weekly point stands for its whole week
+
+        def touches(days, span=span, dates=g["date"]):
+            return dates.map(
+                lambda d: any(d + pd.Timedelta(days=k) in days for k in range(span))
+            ).to_numpy(dtype=bool)
+
+        in_planned, in_unplanned = touches(planned_days), touches(unplanned_days)
+        # Planned event days never enter a baseline. Unplanned ones are left out only while the
+        # event lasts, so it keeps being judged against normal times; afterwards they count
+        # again. Measured (docs/alerts.md): leaving the May 2018 strike out for good pushed the
+        # baseline back into April's recovery from the March crisis, and on-time delivery in
+        # June went undetected.
+        z, expected, scale = _robust_z(
+            adjusted, window, floor, np.where(in_planned, np.nan, adjusted)
+        )
+        if in_unplanned.any():
+            z_in, exp_in, scale_in = _robust_z(
+                adjusted, window, floor, np.where(in_planned | in_unplanned, np.nan, adjusted)
+            )
+            z = np.where(in_unplanned, z_in, z)
+            expected = np.where(in_unplanned, exp_in, expected)
+            scale = np.where(in_unplanned, scale_in, scale)
         g["expected"] = expected * factor
         # Band of normal values for the charts: expected ± THRESHOLD scales, in raw units.
         g["low"] = (expected - THRESHOLD * scale) * factor
         g["high"] = (expected + THRESHOLD * scale) * factor
         g["z"] = z
+        holiday = g["date"].isin(holidays).to_numpy() & (not week)
+        planned = (
+            g["date"]
+            .map(
+                lambda d, sid=sid, span=span: any(
+                    e.kind == "planned"
+                    and sid in e.expected
+                    and any(e.covers(d + pd.Timedelta(days=k)) for k in range(span))
+                    for e in events
+                )
+            )
+            .to_numpy(dtype=bool)
+        )
+        anomalous = (z > THRESHOLD) | (z < -THRESHOLD)
         g["status"] = np.select(
-            [~usable.to_numpy(), thin.to_numpy(), z > THRESHOLD, z < -THRESHOLD],
-            ["incomplete", "thin", "anomaly_up", "anomaly_down"],
+            [
+                ~usable.to_numpy(),
+                thin.to_numpy(),
+                holiday & anomalous,
+                planned & anomalous,
+                z > THRESHOLD,
+                z < -THRESHOLD,
+            ],
+            ["incomplete", "thin", "holiday", "planned", "anomaly_up", "anomaly_down"],
             default="normal",
         )
         out.append(g)
@@ -359,12 +464,31 @@ def completeness(con: duckdb.DuckDBPyConnection) -> tuple[pd.Series, pd.Timestam
     return usable, cutoff
 
 
-def run(con: duckdb.DuckDBPyConnection) -> dict[str, int]:
+def tag_events(eps: pd.DataFrame, events: tuple) -> pd.DataFrame:
+    """Name the registered event an episode starts in or right after (``impact_lag_days``): the
+    late deliveries of 1 June are the strike's, though it ended on 31 May."""
+    eps = eps.copy()
+    eps["event"] = [
+        next(
+            (e.name for e in events if e.start <= pd.Timestamp(start).date() <= e.impact_end),
+            None,
+        )
+        for start in eps["start"]
+    ]
+    return eps
+
+
+def holidays_of(con: duckdb.DuckDBPyConnection) -> frozenset:
+    days = con.execute("SELECT date FROM seed.br_holidays WHERE kind = 'holiday'").df()["date"]
+    return frozenset(pd.to_datetime(days))
+
+
+def run(con: duckdb.DuckDBPyConnection, events: tuple = ()) -> dict[str, int]:
     """Series, detections and episodes for the whole history, into the ``alerts`` schema."""
     usable, cutoff = completeness(con)
     series = build_series(con)
-    det = detect(series, usable)
-    eps = episodes(det)
+    det = detect(series, usable, events, holidays_of(con))
+    eps = tag_events(episodes(det), events)
     con.execute("CREATE SCHEMA IF NOT EXISTS alerts")
     con.register("_det", det)
     con.execute("CREATE OR REPLACE TABLE alerts.detections AS SELECT * FROM _det")

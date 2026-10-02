@@ -1,4 +1,4 @@
-.PHONY: install sample data load quality kpis dashboard screenshots replay test lint
+.PHONY: install sample data load quality kpis dashboard screenshots replay impact test lint
 
 install:
 	pip install -e ".[dev]"
@@ -26,6 +26,9 @@ screenshots:     ## Regenerate docs/screenshots with the Chrome/Edge already ins
 
 replay:          ## Every alert the history would have raised, and when
 	bi replay
+
+impact:          ## What each registered event cost (config/events.yaml)
+	bi impact
 
 test:
 	pytest

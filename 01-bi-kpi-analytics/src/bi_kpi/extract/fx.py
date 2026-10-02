@@ -1,12 +1,14 @@
 """API source: daily BRL exchange rates from the Frankfurter API (ECB reference rates).
 
-Resolution order: live API → local cache → configured fallback rates. The source used is
-kept on every row (``fx_source``) so the dashboard can say how a number was converted.
+Resolution order: live API (three attempts, waiting 1 s then 2 s) → local cache → configured
+fallback rates. The source used is kept on every row (``fx_source``) so the dashboard can say
+how a number was converted.
 """
 
 from __future__ import annotations
 
 import logging
+import time
 from datetime import date
 
 import duckdb
@@ -30,11 +32,27 @@ def fetch_rates(fx: FxSettings, start: date, end: date, timeout: int = 30) -> pd
     return pd.DataFrame(rows)
 
 
+def fetch_with_retries(
+    fx: FxSettings, start: date, end: date, attempts: int = 3, backoff: float = 1.0
+) -> pd.DataFrame:
+    """fetch_rates, retried with a doubling wait: a blip in the API is not worth the cache."""
+    for i in range(attempts):
+        try:
+            return fetch_rates(fx, start, end)
+        except (requests.RequestException, KeyError, ValueError) as exc:
+            if i == attempts - 1:
+                raise
+            wait = backoff * 2**i
+            log.warning("FX API failed (%s); retrying in %.0f s", exc, wait)
+            time.sleep(wait)
+    raise AssertionError("unreachable")
+
+
 def get_rates(fx: FxSettings, start: date, end: date, offline: bool = False) -> pd.DataFrame:
     """Rates per (date, currency) with an ``fx_source`` column: api, cache or fallback."""
     if not offline:
         try:
-            df = fetch_rates(fx, start, end)
+            df = fetch_with_retries(fx, start, end)
             fx.cache.parent.mkdir(parents=True, exist_ok=True)
             df.to_csv(fx.cache, index=False)
             return df.assign(fx_source="api")

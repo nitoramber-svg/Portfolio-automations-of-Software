@@ -28,7 +28,7 @@ ROOT = Path(__file__).resolve().parents[1]
 OUT = ROOT / "docs" / "screenshots"
 APP_PORT, CDP_PORT = 8599, 9339
 WIDTH = 1440
-SHOTS = [  # (file, page, user, height)
+SHOTS = [  # (file, page, user, height[, tab to click])
     ("01-resumen.png", "resumen", "direccion", 1300),
     ("02-ventas.png", "ventas", "direccion", 1420),
     ("03-operacion.png", "operacion", "direccion", 1500),
@@ -36,6 +36,7 @@ SHOTS = [  # (file, page, user, height)
     ("05-calidad.png", "calidad", "direccion", 1300),
     ("06-gerente-nordeste.png", "resumen", "gerente.nordeste", 1300),
     ("07-vendedor.png", "resumen", "vendedor.4869f7a5", 1300),
+    ("08-eventos.png", "alertas", "direccion", 1000, "Eventos"),
 ]
 BROWSERS = [
     r"C:\Program Files\Google\Chrome\Application\chrome.exe",
@@ -107,7 +108,7 @@ async def shoot() -> None:
 async def _shoot_all(page: Page) -> None:
     await page.call("Page.enable")
     await page.call("Runtime.enable")
-    for name, path, user, height in SHOTS:
+    for name, path, user, height, *tab in SHOTS:
         await page.call(
             "Emulation.setDeviceMetricsOverride",
             width=WIDTH,
@@ -118,6 +119,15 @@ async def _shoot_all(page: Page) -> None:
         url = f"http://localhost:{APP_PORT}/{'' if path == 'resumen' else path}?usuario={user}"
         await page.call("Page.navigate", url=url)
         await page.ready()
+        if tab:
+            await page.call(
+                "Runtime.evaluate",
+                expression=(
+                    "[...document.querySelectorAll('[role=tab]')]"
+                    f".find(t => t.innerText.trim() === {tab[0]!r})?.click()"
+                ),
+            )
+            await page.ready()
         shot = await page.call("Page.captureScreenshot", format="png")
         (OUT / name).write_bytes(base64.b64decode(shot["data"]))
         print(f"{name:28} {url}")

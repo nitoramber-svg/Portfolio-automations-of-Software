@@ -35,3 +35,4 @@ jobs:
           bi kpis --user gerente.sudeste --by month --currency MXN
           bi replay
           bi run-daily
+          bi impact

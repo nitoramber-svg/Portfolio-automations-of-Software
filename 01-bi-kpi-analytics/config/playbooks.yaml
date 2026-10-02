@@ -1,0 +1,64 @@
+# What to do when an alert fires (design §6.1-C), per series and direction.
+#
+#   owner           the team that acts
+#   actions         in order; written for the person receiving the alert
+#   orders_at_risk  attach the orders that can still go wrong: open on the alert day (not
+#                   delivered), in the alert's region, due within `horizon_days` or already
+#                   overdue. Order id, state and dates only — no customer data.
+
+horizon_days: 7
+
+playbooks:
+  on_time_delivery:
+    down:
+      owner: Logística
+      orders_at_risk: true
+      actions:
+        - Revisar con cada transportista de la región qué rutas o centros están detenidos.
+        - Atención a clientes avisa a los pedidos en riesgo (lista adjunta) antes de que venzan.
+        - Comercial pausa promociones con envío prometido a la región hasta normalizar.
+
+  carrier_pickups:
+    down:
+      owner: Logística
+      orders_at_risk: true
+      actions:
+        - Confirmar con las paqueterías si suspendieron recolecciones y desde cuándo.
+        - Ampliar en el sitio el plazo de entrega estimado para compras nuevas en la región.
+        - Atención a clientes avisa a los pedidos en riesgo (lista adjunta).
+
+  late_dispatch:
+    up:
+      owner: Operación de vendedores
+      orders_at_risk: true
+      actions:
+        - Contactar a los vendedores con más pedidos sin despachar en la lista adjunta.
+        - Si el atraso viene de la paquetería y no del vendedor, escalar a Logística.
+
+  negative_reviews:
+    up:
+      owner: Atención a clientes
+      actions:
+        - Leer una muestra de las reseñas negativas de la semana y clasificar el motivo.
+        - Si el motivo es retraso, cruzar con las alertas de entregas a tiempo de la región.
+
+  orders:
+    down:
+      owner: Comercial y Tecnología
+      actions:
+        - Descartar una falla del sitio o del pago (Tecnología).
+        - Revisar si terminó una campaña o cambió un precio (Comercial).
+    up:
+      owner: Operación
+      actions:
+        - Confirmar que los vendedores y las paqueterías tienen capacidad para el volumen.
+
+  gmv:
+    down:
+      owner: Comercial
+      actions:
+        - Revisar qué categorías y regiones explican la caída (página Ventas del tablero).
+    up:
+      owner: Comercial
+      actions:
+        - Revisar si un vendedor o un pedido grande explica el pico antes de celebrarlo.

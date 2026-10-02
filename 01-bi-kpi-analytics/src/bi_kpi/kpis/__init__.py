@@ -89,9 +89,22 @@ def load_targets(path: Path) -> TargetSettings:
     )
 
 
-def build_targets(con: duckdb.DuckDBPyConnection, settings: TargetSettings) -> int:
-    """mart.fact_targets: monthly sales plan per customer region (see config/targets.yaml)."""
+def build_targets(
+    con: duckdb.DuckDBPyConnection,
+    settings: TargetSettings,
+    uplifts: dict[int, float] | None = None,
+) -> int:
+    """mart.fact_targets: monthly sales plan per customer region (see config/targets.yaml).
+
+    ``uplifts`` (year_month -> share, from planned events in config/events.yaml) raise that
+    month's plan; when the month later serves as run-rate base, its sales are divided by the
+    same factor, so one Black Friday doesn't inflate the plan of the three months after it.
+    """
     n = settings.lookback_months
+    up = pd.DataFrame(list((uplifts or {}).items()), columns=["year_month", "uplift"]).astype(
+        {"year_month": "int64", "uplift": "float64"}
+    )
+    con.register("_uplifts", up)
     con.execute(
         f"""
         CREATE OR REPLACE TABLE mart.fact_targets AS
@@ -106,26 +119,29 @@ def build_targets(con: duckdb.DuckDBPyConnection, settings: TargetSettings) -> i
         ),
         grid AS (
             SELECT m.year_month, m.month, m.is_complete_month, r.region,
-                   coalesce(s.gmv, 0) AS gmv
+                   coalesce(u.uplift, 0) AS uplift,
+                   coalesce(s.gmv, 0) / (1 + coalesce(u.uplift, 0)) AS base_gmv
             FROM months m CROSS JOIN regions r
             LEFT JOIN sales s ON s.year_month = m.year_month AND s.region = r.region
+            LEFT JOIN _uplifts u ON u.year_month = m.year_month
         ),
         run_rate AS (
             SELECT *,
-                   avg(gmv) OVER w                                         AS base,
+                   avg(base_gmv) OVER w                                    AS base,
                    count(*) FILTER (WHERE is_complete_month) OVER w        AS complete_base
             FROM grid
             WINDOW w AS (PARTITION BY region ORDER BY month
                          ROWS BETWEEN {n} PRECEDING AND 1 PRECEDING)
         )
         SELECT year_month, region,
-               CAST(round(base * (1 + ?), 2) AS DECIMAL(14, 2)) AS target_brl,
-               'run_rate' AS method
+               CAST(round(base * (1 + ?) * (1 + uplift), 2) AS DECIMAL(14, 2)) AS target_brl,
+               CASE WHEN uplift > 0 THEN 'run_rate+event' ELSE 'run_rate' END AS method
         FROM run_rate
         WHERE is_complete_month AND complete_base = {n}
         """,
         [settings.monthly_growth],
     )
+    con.unregister("_uplifts")
     for o in settings.overrides:
         con.execute(
             "DELETE FROM mart.fact_targets WHERE year_month = ? AND region = ?",
