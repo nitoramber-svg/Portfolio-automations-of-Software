@@ -57,9 +57,10 @@ class Settings:
 
 
 def load_settings(root: Path = PROJECT_ROOT) -> Settings:
+    """Settings from config/sources.yaml; BI_DATA_DIR relocates the data (tests, demos)."""
     raw = yaml.safe_load((root / "config" / "sources.yaml").read_text(encoding="utf-8"))
     fx = raw["fx"]
-    return Settings(
+    settings = Settings(
         root=root,
         raw_dir=root / raw["raw_dir"],
         oltp_db=root / raw["oltp_db"],
@@ -73,3 +74,5 @@ def load_settings(root: Path = PROJECT_ROOT) -> Settings:
             fallback_rates={k: float(v) for k, v in fx["fallback_rates"].items()},
         ),
     )
+    data_dir = os.environ.get("BI_DATA_DIR")
+    return settings.with_data_dir(Path(data_dir)) if data_dir else settings

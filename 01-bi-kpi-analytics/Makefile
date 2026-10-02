@@ -1,4 +1,4 @@
-.PHONY: install sample data load quality kpis test lint
+.PHONY: install sample data load quality kpis dashboard screenshots test lint
 
 install:
 	pip install -e ".[dev]"
@@ -17,6 +17,12 @@ quality:         ## Report of every data quality check and the reconciliation
 
 kpis:            ## KPIs as the director sees them (bi kpis --help for users and cuts)
 	bi kpis
+
+dashboard:       ## Streamlit dashboard on http://localhost:8501
+	bi dashboard
+
+screenshots:     ## Regenerate docs/screenshots with the Chrome/Edge already installed
+	python scripts/screenshots.py
 
 test:
 	pytest

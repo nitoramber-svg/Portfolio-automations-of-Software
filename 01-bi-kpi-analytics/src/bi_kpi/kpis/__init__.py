@@ -138,7 +138,7 @@ def build_targets(con: duckdb.DuckDBPyConnection, settings: TargetSettings) -> i
     return con.execute("SELECT count(*) FROM mart.fact_targets").fetchone()[0]
 
 
-def _conditions(
+def conditions(
     dataset: str, start: date | None, end: date | None, filters: dict[str, str]
 ) -> tuple[list[str], list]:
     clauses, params = [], []
@@ -164,7 +164,7 @@ def _conditions(
     return clauses, params
 
 
-def _where(clauses: list[str]) -> str:
+def where_sql(clauses: list[str]) -> str:
     return (" WHERE " + " AND ".join(clauses)) if clauses else ""
 
 
@@ -183,8 +183,8 @@ def _dataset_values(con, user, dataset, kpis, currency, start, end, filters, by)
     if group == "":
         return pd.DataFrame(columns=["key", *[k.id for k in kpis]])
     source, params = relation(con, user, dataset, aggregate=True)
-    clauses, wparams = _conditions(dataset, start, end, filters)
-    where = _where(clauses)
+    clauses, wparams = conditions(dataset, start, end, filters)
+    where = where_sql(clauses)
     cur = currency.lower()
     exprs = ", ".join(f"({k.expr.format(cur=cur)}) AS {k.id}" for k in kpis)
     key = f"{group} AS key, " if group else "NULL AS key, "
@@ -194,17 +194,35 @@ def _dataset_values(con, user, dataset, kpis, currency, start, end, filters, by)
     return con.execute(sql, params + wparams).df()
 
 
-def _plan_attainment(con, user, start, end, filters, by) -> pd.DataFrame:
-    """GMV on the days that have a plan ÷ the plan prorated to those days (in BRL)."""
+def plan_vs_actual(
+    con: duckdb.DuckDBPyConnection,
+    user: User,
+    *,
+    start: date | None = None,
+    end: date | None = None,
+    filters: dict[str, str] | None = None,
+    by: str | None = None,
+    currency: str = "BRL",
+) -> pd.DataFrame:
+    """Sales and plan on the days that have a plan: key, gmv, plan, attainment.
+
+    The plan is prorated by day and converted at each day's rate, like the sales; attainment is
+    computed in BRL so the currency doesn't move it. Empty for cuts the plan doesn't have (a
+    seller, a category, a state).
+    """
+    filters = filters or {}
+    empty = pd.DataFrame(columns=["key", "gmv", "plan", "attainment"])
     if (
         user.role == "seller"
         or any(f not in PLAN_DIMS for f in filters)
         or (by is not None and by not in PLAN_DIMS)
     ):
-        return pd.DataFrame(columns=["key", "value"])
+        return empty
+    cur = currency.lower()
+    rate = "1" if cur == "brl" else f"fx.brl_{cur}"
     source, params = relation(con, user, "v_sales", aggregate=True)
-    clauses, wparams = _conditions("v_sales", start, end, filters)
-    where = _where([*clauses, "NOT is_canceled"])
+    clauses, wparams = conditions("v_sales", start, end, filters)
+    where = where_sql([*clauses, "NOT is_canceled"])
     # Plan days, restricted like the sales: same dates, same region filter, same user regions.
     day_clauses, day_params = ["TRUE"], []
     if start:
@@ -226,22 +244,34 @@ def _plan_attainment(con, user, start, end, filters, by) -> pd.DataFrame:
     sql = f"""
         WITH plan_days AS (
             SELECT d.date, d.year_month, t.region,
-                   t.target_brl / day(last_day(d.date)) AS day_target
-            FROM mart.dim_date d JOIN mart.fact_targets t ON t.year_month = d.year_month
+                   t.target_brl / day(last_day(d.date)) AS day_target_brl,
+                   t.target_brl / day(last_day(d.date)) * {rate} AS day_target
+            FROM mart.dim_date d
+            JOIN mart.fact_targets t ON t.year_month = d.year_month
+            LEFT JOIN mart.fx_daily fx ON fx.date = d.date
             WHERE {" AND ".join(day_clauses)}
         ),
         sales AS (
-            SELECT date, customer_region AS region, sum(price_brl) AS gmv
+            SELECT date, customer_region AS region,
+                   sum(price_brl) AS gmv_brl, sum(price_{cur}) AS gmv
             FROM ({source}){where} GROUP BY ALL
         )
         SELECT {key} AS key,
-               coalesce(sum(s.gmv), 0) / nullif(sum(p.day_target), 0) AS value
+               coalesce(sum(s.gmv), 0)                    AS gmv,
+               sum(p.day_target)                          AS plan,
+               coalesce(sum(s.gmv_brl), 0) / nullif(sum(p.day_target_brl), 0) AS attainment
         FROM plan_days p
         LEFT JOIN sales s ON s.date = p.date AND s.region = p.region
         GROUP BY ALL
+        ORDER BY 1
     """
     df = con.execute(sql, day_params + params + wparams).df()
-    return df.dropna(subset=["value"]) if by else df
+    return df.dropna(subset=["attainment"]) if by else df
+
+
+def _plan_attainment(con, user, start, end, filters, by) -> pd.DataFrame:
+    df = plan_vs_actual(con, user, start=start, end=end, filters=filters, by=by)
+    return df.rename(columns={"attainment": "value"})[["key", "value"]]
 
 
 def compute(
@@ -280,21 +310,21 @@ def compute(
             df = _plan_attainment(con, user, start, end, filters, by)
             long.append(df[["key", "value"]].assign(kpi=k.id))
 
-    values = pd.concat(long, ignore_index=True) if long else pd.DataFrame()
+    # (kpi, key) -> value; a missing key (NULL group, or no grouping) is None.
+    found: dict[tuple[str, object], float] = {}
+    for part in long:
+        for key, value, kpi in part[["key", "value", "kpi"]].itertuples(index=False):
+            key = None if not by or pd.isna(key) else key
+            found[(kpi, key)] = float(value) if pd.notna(value) else float("nan")
     keys = (
-        sorted(values["key"].drop_duplicates().tolist(), key=lambda v: (pd.isna(v), v))
+        sorted({key for _, key in found}, key=lambda v: (v is None, v if v is not None else 0))
         if by
         else [None]
     )
     rows = []
     for key in keys:
         for k in selected:
-            hit = values[(values["kpi"] == k.id) & (values["key"].eq(key) if by else True)]
-            value = (
-                float(hit["value"].iloc[0])
-                if len(hit) and pd.notna(hit["value"].iloc[0])
-                else float("nan")
-            )
+            value = found.get((k.id, key), float("nan"))
             rows.append(
                 {
                     "key": key,
@@ -307,7 +337,9 @@ def compute(
                     "status": k.status(value),
                 }
             )
-    out = pd.DataFrame(rows)
+    out = pd.DataFrame(
+        rows, columns=["key", "kpi", "name", "group", "unit", "value", "target", "status"]
+    )
     # pandas turns None into NaN; "no status" must stay None so callers can test for it.
     out["status"] = out["status"].astype(object).where(out["status"].notna(), None)
     return out if by else out.drop(columns="key")

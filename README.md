@@ -7,7 +7,7 @@ Each folder is an independent project: it takes a role's day-to-day tasks and tu
 
 | # | Project | Role it targets | Status |
 |---|---|---|---|
-| 01 | [BI & KPI Analytics](01-bi-kpi-analytics/) | BI / Data Analyst (Amazon Quick Suite, SQL) — real Olist e-commerce data | 🟡 In progress — step 3/6 ([design](01-bi-kpi-analytics/docs/design.md)) |
+| 01 | [BI & KPI Analytics](01-bi-kpi-analytics/) | BI / Data Analyst (Amazon Quick Suite, SQL) — real Olist e-commerce data | 🟡 In progress — step 4/6 ([design](01-bi-kpi-analytics/docs/design.md)) |
 
 ## Also see
 

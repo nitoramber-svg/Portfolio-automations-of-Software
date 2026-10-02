@@ -1,9 +1,10 @@
-"""Command line: ``bi sample | download | load | quality | kpis | rls-export``."""
+"""Command line: ``bi sample | download | load | quality | kpis | rls-export | dashboard``."""
 
 from __future__ import annotations
 
 import argparse
 import logging
+import subprocess
 import sys
 from datetime import date
 from pathlib import Path
@@ -151,6 +152,18 @@ def _cmd_kpis(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_dashboard(args: argparse.Namespace) -> int:
+    settings = load_settings()
+    if not settings.warehouse.exists():
+        print("error: no warehouse yet — run `bi load` first", file=sys.stderr)
+        return 1
+    app = Path(__file__).parent / "dashboard" / "app.py"
+    cmd = [sys.executable, "-m", "streamlit", "run", str(app), "--server.port", str(args.port)]
+    if args.headless:
+        cmd += ["--server.headless", "true"]
+    return subprocess.call(cmd)
+
+
 def _cmd_rls_export(args: argparse.Namespace) -> int:
     settings = load_settings()
     users = security.load_users(settings.config_dir / "users.yaml")
@@ -190,6 +203,11 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--filter", action="append", default=[], help="e.g. region=Sul (repeatable)")
     p.add_argument("--kpi", action="append", help="only these KPI ids (repeatable)")
     p.set_defaults(func=_cmd_kpis)
+
+    p = sub.add_parser("dashboard", help="open the Streamlit dashboard")
+    p.add_argument("--port", type=int, default=8501)
+    p.add_argument("--headless", action="store_true", help="don't open a browser")
+    p.set_defaults(func=_cmd_dashboard)
 
     p = sub.add_parser("rls-export", help="write the RLS rules as a Quick Suite permissions file")
     p.add_argument("--out", default="data/rls_rules.csv")

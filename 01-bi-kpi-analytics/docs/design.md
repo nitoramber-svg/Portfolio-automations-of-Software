@@ -1,6 +1,6 @@
 # Fase 0 — Diseño: BI & KPI Analytics (datos reales de Olist)
 
-> **Estado:** aprobado; pasos 1–3 hechos. Lo que la medición cambió del plan está en [data-quality.md](data-quality.md) y [kpis.md](kpis.md).
+> **Estado:** aprobado; pasos 1–4 hechos. Lo que la medición cambió del plan está en [data-quality.md](data-quality.md) y [kpis.md](kpis.md).
 > **Vacante de referencia:** Analista de QuickSuite (BI) — CDMX, remoto híbrido, $55k–62k MXN/mes.
 > **Alcance:** 100 % local y gratuito. Guía para migrar a AWS/Amazon Quick Suite al final.
 > **Datos:** reales y públicos — *Brazilian E-Commerce Public Dataset by Olist*.
