@@ -268,5 +268,89 @@ def monthly_completeness(con, user: User) -> pd.DataFrame:
     ).df()
 
 
+def _alert_regions(user: User) -> list[str] | None:
+    """Regions whose anomaly alerts ``user`` may see; None = all (national included).
+
+    Same rule as alert routing: a regional manager sees their regions; a seller none, since
+    alerts are per region and a region's numbers include other sellers.
+    """
+    if user.role in ("director", "analyst"):
+        return None
+    if user.role == "regional_manager":
+        return list(user.regions)
+    return []
+
+
+def _has_alerts(con) -> bool:
+    return bool(
+        con.execute(
+            "SELECT count(*) FROM information_schema.tables "
+            "WHERE table_schema = 'alerts' AND table_name = 'log'"
+        ).fetchone()[0]
+    )
+
+
+def anomaly_alerts(con, view: View) -> pd.DataFrame:
+    """Alerts the detector raised (sent_on in the selected dates) that the user may see."""
+    regions = _alert_regions(view.user)
+    if regions == [] or not _has_alerts(con):
+        return pd.DataFrame(columns=["sent_on", "name", "region", "severity", "subject"])
+    clauses, params = [], []
+    if view.start:
+        clauses.append("sent_on >= ?")
+        params.append(view.start)
+    if view.end:
+        clauses.append("sent_on <= ?")
+        params.append(view.end)
+    if regions is not None:
+        clauses.append(f"region IN ({', '.join('?' for _ in regions)})")
+        params.extend(regions)
+    if "region" in view.filter_dict:
+        clauses.append("region = ?")
+        params.append(view.filter_dict["region"])
+    where = (" WHERE " + " AND ".join(clauses)) if clauses else ""
+    return con.execute(
+        f"SELECT * FROM alerts.log{where} ORDER BY sent_on DESC, severity, region", params
+    ).df()
+
+
+def anomaly_series(con, view: View, series: str, region: str) -> pd.DataFrame:
+    """One detector series with its expected band, if the user may see that region."""
+    regions = _alert_regions(view.user)
+    if regions == [] or (regions is not None and region not in regions):
+        raise AccessDenied(f"{view.user.name} may not see alerts for {region}")
+    clauses, params = ["series = ?", "region = ?"], [series, region]
+    if view.start:
+        clauses.append("date >= ?")
+        params.append(view.start)
+    if view.end:
+        clauses.append("date <= ?")
+        params.append(view.end)
+    df = con.execute(
+        "SELECT date, value, expected, low, high, z, status, grain, den FROM alerts.detections "
+        f"WHERE {' AND '.join(clauses)} ORDER BY date",
+        params,
+    ).df()
+    if series in ("on_time_delivery", "negative_reviews"):  # a share lives in [0, 1]
+        df[["low", "high"]] = df[["low", "high"]].clip(0, 1)
+    else:
+        df["low"] = df["low"].clip(lower=0)
+    return df
+
+
+def alert_regions_for(con, user: User) -> list[str]:
+    regions = _alert_regions(user)
+    if regions is not None:
+        return regions
+    if not _has_alerts(con):
+        return []
+    return [
+        r
+        for (r,) in con.execute(
+            "SELECT DISTINCT region FROM alerts.detections ORDER BY region = 'Brasil' DESC, region"
+        ).fetchall()
+    ]
+
+
 def connect(path) -> duckdb.DuckDBPyConnection:
     return duckdb.connect(str(path), read_only=True)

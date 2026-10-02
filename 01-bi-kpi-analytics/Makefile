@@ -1,4 +1,4 @@
-.PHONY: install sample data load quality kpis dashboard screenshots test lint
+.PHONY: install sample data load quality kpis dashboard screenshots replay test lint
 
 install:
 	pip install -e ".[dev]"
@@ -23,6 +23,9 @@ dashboard:       ## Streamlit dashboard on http://localhost:8501
 
 screenshots:     ## Regenerate docs/screenshots with the Chrome/Edge already installed
 	python scripts/screenshots.py
+
+replay:          ## Every alert the history would have raised, and when
+	bi replay
 
 test:
 	pytest

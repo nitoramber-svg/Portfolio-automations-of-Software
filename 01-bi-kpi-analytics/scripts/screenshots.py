@@ -32,7 +32,7 @@ SHOTS = [  # (file, page, user, height)
     ("01-resumen.png", "resumen", "direccion", 1300),
     ("02-ventas.png", "ventas", "direccion", 1420),
     ("03-operacion.png", "operacion", "direccion", 1500),
-    ("04-alertas.png", "alertas", "direccion", 1050),
+    ("04-alertas.png", "alertas", "direccion", 1250),
     ("05-calidad.png", "calidad", "direccion", 1300),
     ("06-gerente-nordeste.png", "resumen", "gerente.nordeste", 1300),
     ("07-vendedor.png", "resumen", "vendedor.4869f7a5", 1300),

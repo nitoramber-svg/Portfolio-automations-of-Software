@@ -7,6 +7,9 @@ every query goes through bi_kpi.security.
 
 from __future__ import annotations
 
+from contextlib import contextmanager
+
+import numpy as np
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
@@ -35,19 +38,37 @@ SEVERITY_LABELS = {
 @st.cache_resource
 def _resources():
     settings = load_settings()
-    con = data.connect(settings.warehouse)
     catalog = kpis.load_kpis(settings.config_dir / "kpis.yaml")
     users = security.load_users(settings.config_dir / "users.yaml")
-    synthetic = (settings.raw_dir / "SYNTHETIC_DATA.txt").exists()
-    return con, catalog, users, synthetic
+    return settings, catalog, users
 
 
-CON, CATALOG, USERS, SYNTHETIC = _resources()
+SETTINGS, CATALOG, USERS = _resources()
+_LOADED = {"mtime": None}
 
 
-def cur():
-    # One cursor per call: Streamlit runs sessions in threads.
-    return CON.cursor()
+@contextmanager
+def db():
+    """A read-only connection held only for one query: `bi load` and `bi run-daily` can write
+    the warehouse while the dashboard is open (Windows won't open a file another process
+    holds)."""
+    con = data.connect(SETTINGS.warehouse)
+    try:
+        yield con
+    finally:
+        con.close()
+
+
+def refresh_if_reloaded() -> None:
+    """New data since the last run (a `bi load`): drop every cached result."""
+    mtime = SETTINGS.warehouse.stat().st_mtime
+    if _LOADED["mtime"] != mtime:
+        st.cache_data.clear()
+        _LOADED["mtime"] = mtime
+
+
+def synthetic() -> bool:
+    return (SETTINGS.raw_dir / "SYNTHETIC_DATA.txt").exists()
 
 
 # --- cached queries (keyed by the View, which includes the user) ------------------------------
@@ -55,62 +76,89 @@ def cur():
 
 @st.cache_data(show_spinner=False)
 def kpi_values(view: View) -> pd.DataFrame:
-    return data.kpi_values(cur(), view, CATALOG)
+    with db() as con:
+        return data.kpi_values(con, view, CATALOG)
 
 
 @st.cache_data(show_spinner=False)
 def kpi_by(view: View, ids: tuple[str, ...], by: str) -> pd.DataFrame:
-    return data.kpi_by(cur(), view, CATALOG, list(ids), by)
+    with db() as con:
+        return data.kpi_by(con, view, CATALOG, list(ids), by)
 
 
 @st.cache_data(show_spinner=False)
 def plan_by_month(view: View) -> pd.DataFrame:
-    return data.plan_by_month(cur(), view)
+    with db() as con:
+        return data.plan_by_month(con, view)
 
 
 @st.cache_data(show_spinner=False)
 def state_map(view: View) -> pd.DataFrame:
-    return data.state_map(cur(), view, CATALOG)
+    with db() as con:
+        return data.state_map(con, view, CATALOG)
 
 
 @st.cache_data(show_spinner=False)
 def installments(view: View) -> pd.DataFrame:
-    return data.installments(cur(), view)
+    with db() as con:
+        return data.installments(con, view)
 
 
 @st.cache_data(show_spinner=False)
 def delay_vs_score(view: View):
-    return data.delay_vs_score(cur(), view)
+    with db() as con:
+        return data.delay_vs_score(con, view)
 
 
 @st.cache_data(show_spinner=False)
 def alerts(view: View) -> pd.DataFrame:
-    return data.alerts(cur(), view, CATALOG)
+    with db() as con:
+        return data.alerts(con, view, CATALOG)
 
 
 @st.cache_data(show_spinner=False)
 def target_status(view: View, by: str) -> pd.DataFrame:
-    return data.target_status(cur(), view, CATALOG, by)
+    with db() as con:
+        return data.target_status(con, view, CATALOG, by)
+
+
+@st.cache_data(show_spinner=False)
+def anomaly_alerts(view: View) -> pd.DataFrame:
+    with db() as con:
+        return data.anomaly_alerts(con, view)
+
+
+@st.cache_data(show_spinner=False)
+def anomaly_series(view: View, series: str, region: str) -> pd.DataFrame:
+    with db() as con:
+        return data.anomaly_series(con, view, series, region)
+
+
+@st.cache_data(show_spinner=False)
+def alert_regions(user: security.User) -> list[str]:
+    with db() as con:
+        return data.alert_regions_for(con, user)
 
 
 @st.cache_data(show_spinner=False)
 def options(user: security.User) -> dict:
-    return data.options(cur(), View(user))
+    with db() as con:
+        return data.options(con, View(user))
 
 
 @st.cache_data(show_spinner=False)
 def date_bounds():
-    return data.date_bounds(cur())
+    with db() as con:
+        return data.date_bounds(con)
 
 
 @st.cache_data(show_spinner=False)
 def black_friday_months() -> list[int]:
-    return [
-        ym
-        for (ym,) in cur()
-        .execute("SELECT DISTINCT year_month FROM mart.dim_date WHERE is_black_friday")
-        .fetchall()
-    ]
+    with db() as con:
+        rows = con.execute(
+            "SELECT DISTINCT year_month FROM mart.dim_date WHERE is_black_friday"
+        ).fetchall()
+    return [ym for (ym,) in rows]
 
 
 # --- sidebar --------------------------------------------------------------------------------
@@ -210,7 +258,7 @@ def chart(fig: go.Figure, height: int = 340) -> None:
 
 
 def banner(view: View) -> None:
-    if SYNTHETIC:
+    if synthetic():
         st.warning("Datos **sintéticos** con el esquema de Olist (`bi sample`), no los reales.")
     if view.user.role != "director":
         st.info(f"Viendo como **{view.user.name}** · {ROLE_LABELS[view.user.role]}", icon="🔒")
@@ -580,10 +628,138 @@ def page_operations(view: View) -> None:
 def page_alerts(view: View) -> None:
     st.title("Alertas")
     banner(view)
+    anomalies_tab, targets_tab = st.tabs(["Anomalías", "Contra la meta"])
+    with anomalies_tab:
+        anomaly_section(view)
+    with targets_tab:
+        target_section(view)
+
+
+SERIES_LABELS = {
+    "orders": "Pedidos (por fecha de compra)",
+    "gmv": "Ventas (por semana de compra)",
+    "on_time_delivery": "Entregas a tiempo (por fecha en que debían llegar)",
+    "negative_reviews": "Reseñas negativas (por semana de la reseña)",
+}
+
+
+def anomaly_section(view: View) -> None:
     st.caption(
-        "Reglas contra la meta de cada KPI (config/kpis.yaml), por mes completo y por región. "
-        "La detección de anomalías contra la historia de cada serie, el envío por correo/Slack "
-        "y el calendario de eventos llegan en el paso 5."
+        "Cada serie contra su propio pasado: mediana y MAD robusta de los periodos anteriores, "
+        "ajustada por día de la semana; |z| > 3.5 es anomalía. Una advertencia se envía si dura "
+        "dos periodos; una crítica (|z| ≥ 6), de inmediato. Los datos incompletos no se juzgan."
+    )
+    regions = alert_regions(view.user)
+    if not regions:
+        st.info(
+            "Las alertas son por región y cada región incluye ventas de otros vendedores: "
+            "los vendedores no las reciben.",
+            icon="🔒",
+        )
+        return
+    sent = anomaly_alerts(view)
+    c = st.columns(3)
+    c[0].metric("Alertas en la selección", f"{len(sent):,}")
+    c[1].metric("Críticas", f"{(sent['severity'] == 'critical').sum():,}")
+    regional = sent[sent["region"] != "Brasil"]["region"] if len(sent) else pd.Series()
+    c[2].metric("Regiones con alertas", f"{regional.nunique()}")
+
+    left, right = st.columns([2, 1])
+    with right:
+        series_id = st.selectbox(
+            "Serie",
+            list(SERIES_LABELS),
+            index=list(SERIES_LABELS).index("on_time_delivery"),  # where the crises show
+            format_func=SERIES_LABELS.get,
+            key="anomaly_series",
+        )
+        region = st.selectbox("Región", regions, key="anomaly_region")
+    with left:
+        df = anomaly_series(view, series_id, region)
+        unit = {
+            "orders": "count",
+            "gmv": "currency",
+            "on_time_delivery": "ratio",
+            "negative_reviews": "ratio",
+        }[series_id]
+        fig = go.Figure()
+        band = df.dropna(subset=["low", "high"])
+        fig.add_scatter(
+            x=band["date"], y=band["high"], line=dict(width=0), showlegend=False, hoverinfo="skip"
+        )
+        fig.add_scatter(
+            x=band["date"],
+            y=band["low"],
+            fill="tonexty",
+            line=dict(width=0),
+            fillcolor="rgba(37,99,235,0.12)",
+            name="Rango normal",
+            hoverinfo="skip",
+        )
+        fig.add_scatter(
+            x=df["date"],
+            y=df["value"],
+            name="Valor",
+            mode="lines",
+            line=dict(color=BLUE, width=1.5),
+        )
+        for status, color, label in (
+            (
+                "anomaly_up",
+                RED if unit == "ratio" and series_id == "negative_reviews" else GREEN,
+                "Anomalía ↑",
+            ),
+            ("anomaly_down", RED, "Anomalía ↓"),
+        ):
+            pts = df[df["status"] == status]
+            if len(pts):
+                fig.add_scatter(
+                    x=pts["date"],
+                    y=pts["value"],
+                    mode="markers",
+                    name=label,
+                    marker=dict(color=color, size=9, line=dict(color="white", width=1)),
+                )
+        # One grey band per run of incomplete points (the start and the end of the data).
+        incomplete = (df["status"] == "incomplete").to_numpy()
+        runs = (incomplete != np.roll(incomplete, 1)).cumsum()
+        for _, run in df[incomplete].groupby(runs[incomplete]):
+            fig.add_vrect(
+                x0=run["date"].min(),
+                x1=run["date"].max(),
+                fillcolor=GRAY,
+                opacity=0.15,
+                line_width=0,
+                annotation_text="datos incompletos",
+            )
+        if unit == "ratio":
+            fig.update_yaxes(tickformat=".0%")
+        fig.update_layout(title=f"{SERIES_LABELS[series_id]} · {region}")
+        chart(fig, 380)
+
+    if len(sent):
+        st.markdown("##### Alertas enviadas (más recientes primero)")
+        st.dataframe(
+            pd.DataFrame(
+                {
+                    "Enviada": pd.to_datetime(sent["sent_on"]).dt.strftime("%d/%m/%Y"),
+                    "": sent["severity"].map({"critical": "🔴", "warning": "🟠"}),
+                    "Alerta": sent["subject"].str.replace("[BI] ", "", regex=False).str[2:],
+                    "Para": sent["recipients"].map(lambda r: ", ".join(r)),
+                }
+            ),
+            hide_index=True,
+            width="stretch",
+            height=320,
+        )
+    else:
+        st.success("Sin alertas de anomalías en la selección.")
+
+
+def target_section(view: View) -> None:
+    st.caption(
+        "Reglas contra la meta de cada KPI (config/kpis.yaml), por mes completo y por región, "
+        f"con al menos {data.MIN_ORDERS} pedidos."
     )
     a = alerts(view)
     status = target_status(view, "month")
@@ -656,10 +832,11 @@ def page_quality(view: View) -> None:
             icon="🔒",
         )
         return
-    con = cur()
-    report = data.quality_report(con, view.user)
-    recon = data.reconciliation(con, view.user)
-    quarantined = data.quarantine_rows(con, view.user)
+    with db() as con:
+        report = data.quality_report(con, view.user)
+        recon = data.reconciliation(con, view.user)
+        quarantined = data.quarantine_rows(con, view.user)
+        comp = data.monthly_completeness(con, view.user)
     c = st.columns(4)
     c[0].metric("Pruebas", f"{len(report)}")
     c[1].metric("Con hallazgos", f"{(report['rows'] > 0).sum()}")
@@ -687,7 +864,6 @@ def page_quality(view: View) -> None:
         height=420,
     )
 
-    comp = data.monthly_completeness(con, view.user)
     comp["mes"] = pd.to_datetime(comp["year_month"].astype(str), format="%Y%m")
     comp["Estado"] = comp["complete"].map({True: "Completo", False: "Incompleto"})
     fig = px.bar(
@@ -755,6 +931,7 @@ PAGES = {
 
 def main() -> None:
     st.set_page_config(page_title="BI & KPIs · Olist", page_icon="📊", layout="wide")
+    refresh_if_reloaded()
     view = sidebar()
     # The view is bound per run (default argument), never kept in a module global: two
     # people using the dashboard at once must not see each other's selection.
@@ -774,4 +951,5 @@ def main() -> None:
 def render(path: str) -> None:
     """One page without navigation (used by the tests)."""
     st.set_page_config(page_title="BI & KPIs · Olist", layout="wide")
+    refresh_if_reloaded()
     PAGES[path][2](sidebar())

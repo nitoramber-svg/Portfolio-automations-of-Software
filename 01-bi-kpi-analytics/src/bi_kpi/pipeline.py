@@ -8,7 +8,7 @@ from datetime import date
 
 import duckdb
 
-from bi_kpi import kpis, quality
+from bi_kpi import alerts, anomalies, kpis, quality, security
 from bi_kpi.config import Settings
 from bi_kpi.extract import files, fx, oltp
 from bi_kpi.olist import FILE_TABLES, FILES, OPTIONAL_TABLES
@@ -25,6 +25,8 @@ class LoadReport:
     quarantined: dict[str, int] = field(default_factory=dict)
     marts: dict[str, int] = field(default_factory=dict)
     targets: int = 0
+    anomaly_episodes: int = 0
+    alerts: int = 0
 
 
 def _purchase_range(con: duckdb.DuckDBPyConnection) -> tuple[date, date]:
@@ -65,6 +67,12 @@ def load(settings: Settings, offline_fx: bool = False, since: str | None = None)
         quality.reconcile(con)
         report.targets = kpis.build_targets(
             con, kpis.load_targets(settings.config_dir / "targets.yaml")
+        )
+        report.anomaly_episodes = anomalies.run(con)["episodes"]
+        report.alerts = alerts.build_log(
+            con,
+            security.load_users(settings.config_dir / "users.yaml"),
+            alerts.load_alert_settings(settings.config_dir / "alerts.yaml", settings.root),
         )
         for (table,) in con.execute(
             "SELECT table_name FROM information_schema.tables "

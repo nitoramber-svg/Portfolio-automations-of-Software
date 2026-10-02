@@ -1,4 +1,5 @@
-"""Command line: ``bi sample | download | load | quality | kpis | rls-export | dashboard``."""
+"""Command line: ``bi sample | download | load | quality | kpis | rls-export | dashboard |
+run-daily | replay``."""
 
 from __future__ import annotations
 
@@ -6,13 +7,17 @@ import argparse
 import logging
 import subprocess
 import sys
+import threading
+import time
+import urllib.request
+import webbrowser
 from datetime import date
 from pathlib import Path
 
 import duckdb
 import pandas as pd
 
-from bi_kpi import kpis, pipeline, quality, sample, security
+from bi_kpi import alerts, kpis, pipeline, quality, sample, security
 from bi_kpi.config import load_settings
 from bi_kpi.download import DownloadError, download_from_kaggle, extract_zip
 
@@ -96,6 +101,10 @@ def _cmd_load(args: argparse.Namespace) -> int:
     for table, n in report.marts.items():
         print(f"  mart.{table:22} {n:>9,}")
     print(f"Sales plan: {report.targets:,} region-months (config/targets.yaml)")
+    print(
+        f"Anomalies: {report.anomaly_episodes:,} episodes, {report.alerts:,} alerts "
+        "(bi replay to see them)"
+    )
     print(f"Warehouse: {settings.warehouse}")
     return 0
 
@@ -158,10 +167,92 @@ def _cmd_dashboard(args: argparse.Namespace) -> int:
         print("error: no warehouse yet — run `bi load` first", file=sys.stderr)
         return 1
     app = Path(__file__).parent / "dashboard" / "app.py"
-    cmd = [sys.executable, "-m", "streamlit", "run", str(app), "--server.port", str(args.port)]
-    if args.headless:
-        cmd += ["--server.headless", "true"]
+    # Always headless: otherwise Streamlit's first run stops at an e-mail sign-up prompt in
+    # the terminal. We open the browser ourselves once the server answers.
+    cmd = [
+        sys.executable,
+        "-m",
+        "streamlit",
+        "run",
+        str(app),
+        "--server.port",
+        str(args.port),
+        "--server.headless",
+        "true",
+        "--browser.gatherUsageStats",
+        "false",
+    ]
+    url = f"http://localhost:{args.port}"
+    if not args.headless:
+        threading.Thread(target=_open_when_up, args=(url,), daemon=True).start()
+    print(f"Dashboard: {url}  (Ctrl+C to stop)")
     return subprocess.call(cmd)
+
+
+def _open_when_up(url: str, timeout: float = 60) -> None:
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        try:
+            urllib.request.urlopen(f"{url}/_stcore/health", timeout=2)
+            webbrowser.open(url)
+            return
+        except OSError:
+            time.sleep(0.5)
+
+
+def _alert_settings(settings):
+    return alerts.load_alert_settings(settings.config_dir / "alerts.yaml", settings.root)
+
+
+def _print_alerts(df) -> None:
+    for a in df.itertuples():
+        to = ", ".join(a.recipients) or "—"
+        print(f"  {a.sent_on}  {a.subject}")
+        print(f"              → {to}")
+
+
+def _cmd_run_daily(args: argparse.Namespace) -> int:
+    """One day as a live system would run it: the alerts that day raises, delivered."""
+    settings = load_settings()
+    cfg = _alert_settings(settings)
+    with duckdb.connect(str(settings.warehouse), read_only=True) as con:
+        cutoff = con.execute("SELECT data_cutoff FROM alerts.meta").fetchone()[0]
+        day = date.fromisoformat(args.date) if args.date else cutoff
+        if cutoff is not None and day > cutoff:
+            print(f"{day}: data incomplete after {cutoff} (end of the dataset) — no alerts")
+            return 0
+        todays = alerts.alerts_between(con, day, day)
+    if todays.empty:
+        print(f"{day}: no alerts")
+        return 0
+    print(f"{day}: {len(todays)} alert(s)")
+    _print_alerts(todays)
+    for item in alerts.deliver(todays, cfg):
+        print(f"  delivered: {item}")
+    return 0
+
+
+def _cmd_replay(args: argparse.Namespace) -> int:
+    """Walk a date range: which alerts would have arrived, when, and to whom."""
+    settings = load_settings()
+    cfg = _alert_settings(settings)
+    start = date.fromisoformat(args.start) if args.start else None
+    end = date.fromisoformat(args.end) if args.end else None
+    with duckdb.connect(str(settings.warehouse), read_only=True) as con:
+        df = alerts.alerts_between(con, start, end)
+        cutoff = con.execute("SELECT data_cutoff FROM alerts.meta").fetchone()[0]
+    print(f"{len(df)} alerts between {start or 'start'} and {end or 'end'}")
+    _print_alerts(df)
+    if cutoff is not None:
+        print(f"Data after {cutoff} is incomplete (end of the dataset): not judged, no alerts.")
+    if len(df):
+        per_month = df.assign(m=df["sent_on"].astype(str).str[:7]).groupby(["m", "name"]).size()
+        print("Alerts per month and KPI:")
+        print(per_month.unstack(fill_value=0).to_string())
+    if args.deliver:
+        done = alerts.deliver(df, cfg)
+        print(f"Delivered {len(done)} messages ({cfg.mode} mode, {cfg.outbox})")
+    return 0
 
 
 def _cmd_rls_export(args: argparse.Namespace) -> int:
@@ -208,6 +299,16 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--port", type=int, default=8501)
     p.add_argument("--headless", action="store_true", help="don't open a browser")
     p.set_defaults(func=_cmd_dashboard)
+
+    p = sub.add_parser("run-daily", help="deliver the alerts of one day, as a live run would")
+    p.add_argument("--date", help="YYYY-MM-DD (default: the last complete day of data)")
+    p.set_defaults(func=_cmd_run_daily)
+
+    p = sub.add_parser("replay", help="which alerts would have arrived in a date range")
+    p.add_argument("--from", dest="start", help="YYYY-MM-DD")
+    p.add_argument("--to", dest="end", help="YYYY-MM-DD")
+    p.add_argument("--deliver", action="store_true", help="also write/send them all")
+    p.set_defaults(func=_cmd_replay)
 
     p = sub.add_parser("rls-export", help="write the RLS rules as a Quick Suite permissions file")
     p.add_argument("--out", default="data/rls_rules.csv")

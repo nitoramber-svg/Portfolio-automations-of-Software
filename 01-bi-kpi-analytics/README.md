@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/nitoramber-svg/Portfolio-automations-of-Software/actions/workflows/bi-kpi-analytics.yml/badge.svg)](https://github.com/nitoramber-svg/Portfolio-automations-of-Software/actions/workflows/bi-kpi-analytics.yml)
 
-> 🚧 **Work in progress** — steps 1–4 of 6 done (sources → staging → quality → star schema → KPIs and row-level security → dashboard). See the [design](docs/design.md).
+> 🚧 **Work in progress** — steps 1–5 of 6 done (sources → staging → quality → star schema → KPIs and row-level security → dashboard → anomaly alerts). See the [design](docs/design.md).
 
 An end-to-end Business Intelligence pipeline built on **real, public data from Olist**, a Brazilian
 e-commerce marketplace (~100k orders, 2016–2018). It targets the day-to-day of a BI / Data Analyst role:
@@ -23,7 +23,8 @@ real de Analista de BI (Amazon Quick Suite, SQL, AWS). Ver el [diseño](docs/des
 | KPI engine: 13 KPIs declared in YAML, any cut (date, region, state, category, seller, payment), BRL / MXN / USD; sales plan prorated by day | ✅ |
 | Row-level security in the query layer: region managers, an analyst without customer-level data, sellers who see only their own lines of shared orders — [details and real numbers](docs/kpis.md) | ✅ |
 | Dashboard (Streamlit, Spanish): executive summary with a plain-language reading, sales, operations & satisfaction, target alerts, data quality — every chart goes through row-level security | ✅ |
-| Anomaly detection, alerts, event calendar, early warning | ⏳ step 5 |
+| Anomaly detection (robust z: median + MAD, weekday-adjusted), alerts routed like row-level security, e-mail / Slack with a demo outbox, `bi run-daily` and `bi replay` — finds Black Friday and the 2018 truckers' strike, ignores the end of the data, ~0.24 unexplained alerts per KPI per month — [details](docs/alerts.md) | ✅ |
+| Event calendar, early warning, playbooks, impact analysis | ⏳ step 5b |
 
 ## Dashboard
 
@@ -63,6 +64,7 @@ bi download --zip path/to/archive.zip # or the ZIP downloaded from Kaggle
 bi load      # extract → staging → quality → star schema  (add --offline to skip the FX API)
 bi quality   # every check: rows flagged, % and value of the affected orders
 bi dashboard # http://localhost:8501 — pick a user in the sidebar to see row-level security
+bi replay --from 2018-05-15 --to 2018-06-15   # which alerts the strike would have raised
 bi kpis --user gerente.nordeste --from 2018-01-01 --by month --currency MXN
 pytest
 ```
