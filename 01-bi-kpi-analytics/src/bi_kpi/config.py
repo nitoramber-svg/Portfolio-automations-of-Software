@@ -30,10 +30,12 @@ class Settings:
     fx: FxSettings
     sql_dir: Path = field(init=False)
     seeds_dir: Path = field(init=False)
+    config_dir: Path = field(init=False)
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "sql_dir", self.root / "sql")
         object.__setattr__(self, "seeds_dir", self.root / "seeds")
+        object.__setattr__(self, "config_dir", self.root / "config")
 
     def with_data_dir(self, data_dir: Path) -> Settings:
         """Same settings, with every data file relocated under ``data_dir`` (used by tests)."""

@@ -1,0 +1,138 @@
+# KPI catalog. Adding a KPI here needs no code change.
+#
+#   dataset    v_sales (one row per order line), v_orders (per order) or v_reviews (per reviewed
+#              order, its latest review) — see sql/marts/40_datasets.sql
+#   expr       one SQL aggregate over that dataset. It is evaluated over whatever rows the user
+#              may see and the filters select, so ratios are always Σ/Σ, never an average of
+#              averages. {cur} becomes brl, mxn or usd.
+#   unit       currency | count | ratio | days | score
+#   direction  up (higher is better) | down | none
+#   target     the value that counts as "on target" (in the KPI's unit; ratios as 0–1).
+#              plan_attainment's target is a share of the sales plan (config/targets.yaml).
+#
+# Canceled and unavailable orders are not sales: sales KPIs exclude them, the cancellation rate
+# counts them.
+
+kpis:
+  # --- Ventas ---------------------------------------------------------------------------------
+  - id: gmv
+    name: Ventas (GMV)
+    group: Ventas
+    dataset: v_sales
+    expr: sum(price_{cur}) FILTER (WHERE NOT is_canceled)
+    unit: currency
+    direction: up
+
+  - id: plan_attainment
+    name: Cumplimiento de meta
+    group: Ventas
+    plan_of: gmv            # computed by the engine: GMV ÷ prorated sales plan
+    unit: ratio
+    direction: up
+    target: 0.90
+
+  - id: orders
+    name: Pedidos
+    group: Ventas
+    dataset: v_orders
+    expr: count(*) FILTER (WHERE NOT is_canceled)
+    unit: count
+    direction: up
+
+  - id: avg_ticket
+    name: Ticket promedio
+    group: Ventas
+    dataset: v_sales
+    expr: >-
+      sum(price_{cur}) FILTER (WHERE NOT is_canceled)
+      / nullif(count(DISTINCT order_id) FILTER (WHERE NOT is_canceled), 0)
+    unit: currency
+    direction: up
+
+  # --- Clientes -------------------------------------------------------------------------------
+  - id: unique_customers
+    name: Clientes únicos
+    group: Clientes
+    dataset: v_orders
+    expr: count(DISTINCT customer_unique_id) FILTER (WHERE NOT is_canceled)
+    unit: count
+    direction: up
+
+  - id: repeat_rate
+    name: Tasa de recompra
+    group: Clientes
+    dataset: v_orders
+    # Customers with 2+ orders in the period over customers in the period (histogram counts
+    # orders per customer).
+    expr: >-
+      len(list_filter(map_values(histogram(customer_unique_id) FILTER (WHERE NOT is_canceled)),
+                      n -> n >= 2))
+      / nullif(count(DISTINCT customer_unique_id) FILTER (WHERE NOT is_canceled), 0)
+    unit: ratio
+    direction: up
+
+  # --- Operación ------------------------------------------------------------------------------
+  - id: on_time_delivery
+    name: Entregas a tiempo (OTD)
+    group: Operación
+    dataset: v_orders
+    expr: count(*) FILTER (WHERE on_time) / nullif(count(*) FILTER (WHERE is_delivered), 0)
+    unit: ratio
+    direction: up
+    target: 0.90
+
+  - id: delivery_days
+    name: Días de entrega
+    group: Operación
+    dataset: v_orders
+    expr: avg(delivery_days) FILTER (WHERE is_delivered)
+    unit: days
+    direction: down
+
+  - id: freight_share
+    name: Flete % de venta
+    group: Operación
+    dataset: v_sales
+    expr: >-
+      sum(freight_{cur}) FILTER (WHERE NOT is_canceled)
+      / nullif(sum(price_{cur}) FILTER (WHERE NOT is_canceled), 0)
+    unit: ratio
+    direction: down
+    target: 0.20
+
+  - id: cancel_rate
+    name: Tasa de cancelación
+    group: Operación
+    dataset: v_orders
+    expr: count(*) FILTER (WHERE is_canceled) / nullif(count(*), 0)
+    unit: ratio
+    direction: down
+    target: 0.02
+
+  # --- Satisfacción ---------------------------------------------------------------------------
+  - id: avg_score
+    name: Calificación promedio
+    group: Satisfacción
+    dataset: v_reviews
+    expr: avg(score)
+    unit: score
+    direction: up
+    target: 4.0
+
+  - id: negative_reviews
+    name: '% reseñas negativas'
+    group: Satisfacción
+    dataset: v_reviews
+    expr: count(*) FILTER (WHERE is_negative) / nullif(count(*), 0)
+    unit: ratio
+    direction: down
+    target: 0.15
+
+  # --- Marketplace ----------------------------------------------------------------------------
+  - id: active_sellers
+    name: Vendedores activos
+    group: Marketplace
+    dataset: v_sales
+    expr: count(DISTINCT seller_id) FILTER (WHERE NOT is_canceled)
+    unit: count
+    direction: none

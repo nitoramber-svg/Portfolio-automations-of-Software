@@ -81,7 +81,7 @@ se dejan como están: sustituirlos por la ciudad del código postal sería inven
 | Pedido con varias reseñas | 547 pedidos | El cliente volvió a contestar (202 con calificación distinta). `fact_reviews.is_latest_for_order` marca la última |
 | Producto sin categoría | 610 (1.9 %) | Aparece como «Sin categoría» |
 | Enviado antes de la compra | 166 | **Todos entre abril y agosto de 2018**, mediana 35 min antes: reloj del sistema del transportista. El tiempo total de entrega sí es válido |
-| **Estado del vendedor ≠ estado de su CP** | 35 (1.1 %) | No estaba previsto. Ej.: vendedores con CP de Río (21xxx) declarados en SP. Importa para la seguridad por región del paso 3 |
+| **Estado del vendedor ≠ estado de su CP** | 35 (1.1 %) | No estaba previsto. Ej.: vendedores con CP de Río (21xxx) declarados en SP. Afecta los análisis por región *del vendedor*; la seguridad por región (paso 3) filtra por la del cliente, así que no la toca |
 | Pago ≠ precio + flete sin explicación | 54 | 39 pagan *menos* (todos entregados) |
 | Entregado antes de salir con la paquetería | 23 | El tiempo total es válido; el de tránsito no |
 | Meses incompletos | 6 de 26 | Sep–dic 2016 (nov 2016 sin un solo pedido) y sep–oct 2018. `dim_date.is_complete_month` los marca para que tendencias y anomalías no los comparen |

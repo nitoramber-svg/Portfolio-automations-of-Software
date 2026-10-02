@@ -1,15 +1,17 @@
-"""Command line: ``bi sample | download | load | quality``."""
+"""Command line: ``bi sample | download | load | quality | kpis | rls-export``."""
 
 from __future__ import annotations
 
 import argparse
 import logging
 import sys
+from datetime import date
 from pathlib import Path
 
 import duckdb
+import pandas as pd
 
-from bi_kpi import pipeline, quality, sample
+from bi_kpi import kpis, pipeline, quality, sample, security
 from bi_kpi.config import load_settings
 from bi_kpi.download import DownloadError, download_from_kaggle, extract_zip
 
@@ -92,7 +94,68 @@ def _cmd_load(args: argparse.Namespace) -> int:
     print("Star schema:")
     for table, n in report.marts.items():
         print(f"  mart.{table:22} {n:>9,}")
+    print(f"Sales plan: {report.targets:,} region-months (config/targets.yaml)")
     print(f"Warehouse: {settings.warehouse}")
+    return 0
+
+
+def _format(value: float, unit: str, currency: str) -> str:
+    if value != value:  # NaN: not computable for this cut
+        return "—"
+    if unit == "currency":
+        return f"{currency} {value:,.2f}"
+    if unit == "ratio":
+        return f"{value:.2%}"
+    if unit == "count":
+        return f"{value:,.0f}"
+    return f"{value:,.2f}"
+
+
+def _cmd_kpis(args: argparse.Namespace) -> int:
+    settings = load_settings()
+    try:
+        user = security.load_users(settings.config_dir / "users.yaml").get(args.user)
+    except security.AccessDenied as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 1
+    catalog = kpis.load_kpis(settings.config_dir / "kpis.yaml")
+    filters = dict(f.split("=", 1) for f in args.filter)
+    with duckdb.connect(str(settings.warehouse), read_only=True) as con:
+        df = kpis.compute(
+            con,
+            user,
+            catalog,
+            ids=args.kpi or None,
+            start=date.fromisoformat(args.start) if args.start else None,
+            end=date.fromisoformat(args.end) if args.end else None,
+            filters=filters,
+            currency=args.currency,
+            by=args.by,
+        )
+    print(
+        f"User {user.name} ({user.role}), {args.start or 'start'} → {args.end or 'end'}, "
+        f"{args.currency.upper()}" + (f", {filters}" if filters else "")
+    )
+    marks = {"ok": "✓", "off_target": "✗"}
+    for _, r in df.iterrows():
+        key = f"{r['key']!s:>14}  " if args.by else ""
+        target = (
+            ""
+            if pd.isna(r["target"])
+            else f"  meta {_format(r['target'], r['unit'], args.currency.upper())}"
+        )
+        print(
+            f"  {key}{marks.get(r['status'], ' ')} {r['name']:26} "
+            f"{_format(r['value'], r['unit'], args.currency.upper()):>22}{target}"
+        )
+    return 0
+
+
+def _cmd_rls_export(args: argparse.Namespace) -> int:
+    settings = load_settings()
+    users = security.load_users(settings.config_dir / "users.yaml")
+    path = security.export_rls_rules(users, Path(args.out))
+    print(f"RLS rules for {len(users.by_name)} users written to {path}")
     return 0
 
 
@@ -117,6 +180,20 @@ def main(argv: list[str] | None = None) -> int:
 
     p = sub.add_parser("quality", help="data quality report and reconciliation of the last load")
     p.set_defaults(func=_cmd_quality)
+
+    p = sub.add_parser("kpis", help="KPIs as one user sees them")
+    p.add_argument("--user", default="direccion", help="a user from config/users.yaml")
+    p.add_argument("--from", dest="start", help="first purchase date, YYYY-MM-DD")
+    p.add_argument("--to", dest="end", help="last purchase date, YYYY-MM-DD")
+    p.add_argument("--currency", default="BRL", help="BRL, MXN or USD")
+    p.add_argument("--by", help="month, region, state, payment_type, category or seller")
+    p.add_argument("--filter", action="append", default=[], help="e.g. region=Sul (repeatable)")
+    p.add_argument("--kpi", action="append", help="only these KPI ids (repeatable)")
+    p.set_defaults(func=_cmd_kpis)
+
+    p = sub.add_parser("rls-export", help="write the RLS rules as a Quick Suite permissions file")
+    p.add_argument("--out", default="data/rls_rules.csv")
+    p.set_defaults(func=_cmd_rls_export)
 
     args = parser.parse_args(argv)
     logging.basicConfig(

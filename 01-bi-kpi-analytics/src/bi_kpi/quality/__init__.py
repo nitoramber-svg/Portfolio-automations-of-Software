@@ -317,7 +317,7 @@ CHECKS: tuple[Check, ...] = (
         "sellers",
         "warning",
         "El estado declarado no es el de su CP (que pertenece a un solo estado); "
-        "la región y la seguridad por región usan el declarado",
+        "los análisis por región del vendedor usan el declarado",
         "WITH g AS (SELECT lpad(trim(geolocation_zip_code_prefix), 5, '0') AS zip, "
         "min(upper(trim(geolocation_state))) AS state FROM raw.geolocation GROUP BY 1 "
         "HAVING count(DISTINCT upper(trim(geolocation_state))) = 1) "

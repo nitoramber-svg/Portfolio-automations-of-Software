@@ -1,0 +1,28 @@
+# Demo users for row-level security. No passwords: the dashboard's user picker exists to show
+# what each role can see, and the restriction is enforced in the query layer (bi_kpi.security).
+#
+#   director           every row
+#   regional_manager   orders of customers in `regions`
+#   analyst            every row, but no customer-level columns
+#   seller             only their own order lines, and the orders and reviews those lines belong
+#                      to — never another seller's lines or the order totals that include them
+
+users:
+  direccion:
+    role: director
+  analista:
+    role: analyst
+  gerente.sudeste:
+    role: regional_manager
+    regions: [Sudeste]
+  gerente.nordeste:
+    role: regional_manager
+    regions: [Nordeste]
+  # Two real sellers (Olist ids are anonymized hashes): the top seller by sales, in SP, and the
+  # second, in BA.
+  vendedor.4869f7a5:
+    role: seller
+    seller_id: 4869f7a5dfa277a7dca6462dcf3b52b2
+  vendedor.53243585:
+    role: seller
+    seller_id: 53243585a1d6dc2643021fd1853d8905

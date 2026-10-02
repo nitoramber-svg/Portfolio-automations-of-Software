@@ -31,3 +31,5 @@ jobs:
         run: |
           bi sample --orders-per-day 10
           bi load
+          bi quality
+          bi kpis --user gerente.sudeste --by month --currency MXN

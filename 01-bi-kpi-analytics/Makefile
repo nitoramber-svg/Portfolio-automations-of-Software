@@ -1,4 +1,4 @@
-.PHONY: install sample data load quality test lint
+.PHONY: install sample data load quality kpis test lint
 
 install:
 	pip install -e ".[dev]"
@@ -14,6 +14,9 @@ load:            ## Extract the 3 sources, build staging and the star schema
 
 quality:         ## Report of every data quality check and the reconciliation
 	bi quality
+
+kpis:            ## KPIs as the director sees them (bi kpis --help for users and cuts)
+	bi kpis
 
 test:
 	pytest

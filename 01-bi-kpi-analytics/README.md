@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/nitoramber-svg/Portfolio-automations-of-Software/actions/workflows/bi-kpi-analytics.yml/badge.svg)](https://github.com/nitoramber-svg/Portfolio-automations-of-Software/actions/workflows/bi-kpi-analytics.yml)
 
-> 🚧 **Work in progress** — steps 1–2 of 6 done (sources → staging → quality → star schema). See the [design](docs/design.md).
+> 🚧 **Work in progress** — steps 1–3 of 6 done (sources → staging → quality → star schema → KPIs and row-level security). See the [design](docs/design.md).
 
 An end-to-end Business Intelligence pipeline built on **real, public data from Olist**, a Brazilian
 e-commerce marketplace (~100k orders, 2016–2018). It targets the day-to-day of a BI / Data Analyst role:
@@ -20,7 +20,8 @@ real de Analista de BI (Amazon Quick Suite, SQL, AWS). Ver el [diseño](docs/des
 | Star schema: 6 dimensions, 3 fact tables, daily aggregate, BRL → MXN/USD conversion | ✅ |
 | Tests on a hand-made fixture with known answers + CI | ✅ |
 | Data quality: 30 checks, quarantine of self-contradicting rows, report, and a reconciliation that refuses to publish marts that lost data — [what the real data showed](docs/data-quality.md) | ✅ |
-| KPI engine, targets, row-level security | ⏳ step 3 |
+| KPI engine: 13 KPIs declared in YAML, any cut (date, region, state, category, seller, payment), BRL / MXN / USD; sales plan prorated by day | ✅ |
+| Row-level security in the query layer: region managers, an analyst without customer-level data, sellers who see only their own lines of shared orders — [details and real numbers](docs/kpis.md) | ✅ |
 | Dashboard | ⏳ step 4 |
 | Anomaly detection, alerts, event calendar, early warning | ⏳ step 5 |
 
@@ -38,6 +39,7 @@ bi download --zip path/to/archive.zip # or the ZIP downloaded from Kaggle
 
 bi load      # extract → staging → quality → star schema  (add --offline to skip the FX API)
 bi quality   # every check: rows flagged, % and value of the affected orders
+bi kpis --user gerente.nordeste --from 2018-01-01 --by month --currency MXN
 pytest
 ```
 

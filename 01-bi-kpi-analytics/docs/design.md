@@ -1,6 +1,6 @@
 # Fase 0 — Diseño: BI & KPI Analytics (datos reales de Olist)
 
-> **Estado:** aprobado; pasos 1–2 hechos. Lo que la medición cambió del plan está en [data-quality.md](data-quality.md).
+> **Estado:** aprobado; pasos 1–3 hechos. Lo que la medición cambió del plan está en [data-quality.md](data-quality.md) y [kpis.md](kpis.md).
 > **Vacante de referencia:** Analista de QuickSuite (BI) — CDMX, remoto híbrido, $55k–62k MXN/mes.
 > **Alcance:** 100 % local y gratuito. Guía para migrar a AWS/Amazon Quick Suite al final.
 > **Datos:** reales y públicos — *Brazilian E-Commerce Public Dataset by Olist*.
@@ -57,7 +57,7 @@ descarga (Kaggle API) o los toma de un ZIP local. Las pruebas usan un *fixture* 
 
 | Falta | Solución |
 |---|---|
-| Metas de venta | Meta derivada: mismo mes del año anterior × (1 + crecimiento objetivo), configurable en `targets.yaml` |
+| Metas de venta | ~~Mismo mes del año anterior~~ → **promedio de los 3 meses previos × (1 + crecimiento)**: Olist creció 8× en un año y la meta anual saldría cumplida al 650 % ([kpis.md](kpis.md#metas-lo-que-cambió-al-medir)) |
 | Costo del producto (margen) | Se sustituye por **flete como % de la venta** y **ventas netas de cancelaciones** |
 | Moneda local | Conversión real BRL → MXN y USD con el tipo de cambio histórico de cada día |
 

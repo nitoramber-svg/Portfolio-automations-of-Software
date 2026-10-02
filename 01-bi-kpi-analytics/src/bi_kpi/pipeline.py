@@ -1,4 +1,4 @@
-"""End-to-end load: extract the three sources, build staging, check quality, build the marts."""
+"""End-to-end load: extract the sources, build staging, check quality, build marts and plan."""
 
 from __future__ import annotations
 
@@ -8,7 +8,7 @@ from datetime import date
 
 import duckdb
 
-from bi_kpi import quality
+from bi_kpi import kpis, quality
 from bi_kpi.config import Settings
 from bi_kpi.extract import files, fx, oltp
 from bi_kpi.olist import FILE_TABLES, FILES, OPTIONAL_TABLES
@@ -24,6 +24,7 @@ class LoadReport:
     sql_files: list[str] = field(default_factory=list)
     quarantined: dict[str, int] = field(default_factory=dict)
     marts: dict[str, int] = field(default_factory=dict)
+    targets: int = 0
 
 
 def _purchase_range(con: duckdb.DuckDBPyConnection) -> tuple[date, date]:
@@ -62,9 +63,12 @@ def load(settings: Settings, offline_fx: bool = False, since: str | None = None)
         report.quarantined = quality.run(con)
         report.sql_files += run_sql(con, settings.sql_dir, ("marts",))
         quality.reconcile(con)
+        report.targets = kpis.build_targets(
+            con, kpis.load_targets(settings.config_dir / "targets.yaml")
+        )
         for (table,) in con.execute(
             "SELECT table_name FROM information_schema.tables "
-            "WHERE table_schema = 'mart' ORDER BY table_name"
+            "WHERE table_schema = 'mart' AND table_type = 'BASE TABLE' ORDER BY table_name"
         ).fetchall():
             report.marts[table] = con.execute(f"SELECT count(*) FROM mart.{table}").fetchone()[0]
     return report
