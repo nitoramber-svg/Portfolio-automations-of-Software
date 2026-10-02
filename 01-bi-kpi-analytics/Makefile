@@ -1,4 +1,4 @@
-.PHONY: install sample data load quality kpis dashboard screenshots replay impact test lint
+.PHONY: install sample data load quality kpis dashboard screenshots replay impact export benchmark test lint
 
 install:
 	pip install -e ".[dev]"
@@ -29,6 +29,12 @@ replay:          ## Every alert the history would have raised, and when
 
 impact:          ## What each registered event cost (config/events.yaml)
 	bi impact
+
+export:          ## Parquet + Athena DDL + RLS rules for Quick Suite (data/export)
+	bi export
+
+benchmark:       ## Dashboard speed, views vs tables (docs/benchmark.md)
+	python scripts/benchmark.py --compare-views
 
 test:
 	pytest

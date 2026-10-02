@@ -23,7 +23,7 @@ jobs:
       - run: pip install -e ".[dev]"
       - name: Lint
         run: |
-          ruff check src tests
+          ruff check src tests scripts
           ruff format --check src tests
       - name: Tests
         run: pytest
@@ -36,3 +36,4 @@ jobs:
           bi replay
           bi run-daily
           bi impact
+          bi export --out /tmp/export

@@ -1,5 +1,5 @@
-"""Command line: ``bi sample | download | load | quality | kpis | rls-export | dashboard |
-run-daily | replay``."""
+"""Command line: ``bi sample | download | load | quality | kpis | dashboard | run-daily |
+replay | impact | export | rls-export``."""
 
 from __future__ import annotations
 
@@ -17,7 +17,7 @@ from pathlib import Path
 import duckdb
 import pandas as pd
 
-from bi_kpi import alerts, events, kpis, pipeline, quality, sample, security
+from bi_kpi import alerts, events, export, kpis, pipeline, quality, sample, security
 from bi_kpi.config import load_settings
 from bi_kpi.download import DownloadError, download_from_kaggle, extract_zip
 
@@ -290,6 +290,19 @@ def _cmd_impact(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_export(args: argparse.Namespace) -> int:
+    """Parquet + Athena DDL + RLS rules for Amazon Quick Suite (docs/quicksuite.md)."""
+    settings = load_settings()
+    users = security.load_users(settings.config_dir / "users.yaml")
+    out = Path(args.out)
+    with duckdb.connect(str(settings.warehouse), read_only=True) as con:
+        rows = export.export(con, out, users, args.bucket)
+    for name, n in rows.items():
+        print(f"  {name:24} {n:>9,}")
+    print(f"Export in {out}: upload it to {args.bucket}, then run athena.sql")
+    return 0
+
+
 def _cmd_rls_export(args: argparse.Namespace) -> int:
     settings = load_settings()
     users = security.load_users(settings.config_dir / "users.yaml")
@@ -347,6 +360,11 @@ def main(argv: list[str] | None = None) -> int:
 
     p = sub.add_parser("impact", help="what each registered event cost (config/events.yaml)")
     p.set_defaults(func=_cmd_impact)
+
+    p = sub.add_parser("export", help="Parquet + Athena DDL + RLS rules for Quick Suite")
+    p.add_argument("--out", default="data/export")
+    p.add_argument("--bucket", default="s3://your-bucket/olist-bi", help="S3 prefix for Athena")
+    p.set_defaults(func=_cmd_export)
 
     p = sub.add_parser("rls-export", help="write the RLS rules as a Quick Suite permissions file")
     p.add_argument("--out", default="data/rls_rules.csv")

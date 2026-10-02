@@ -1,10 +1,13 @@
 -- The three datasets the KPI engine and the security layer read: the star schema flattened to
 -- the attributes a user can filter, group or be restricted by. Nothing reads the facts directly.
+-- Materialized as tables, not views (the "v_" names predate that): every dashboard query would
+-- otherwise redo these joins. Measured: the executive summary went from 1.9 s to 0.64 s, for
+-- 1.5 s more per load (docs/benchmark.md).
 -- Every dataset is dated by the order's purchase date, so one date filter means the same thing
 -- for sales, deliveries and reviews.
 
 -- One row per order line. The only grain where a seller owns the row (1,278 orders mix sellers).
-CREATE OR REPLACE VIEW mart.v_sales AS
+CREATE OR REPLACE TABLE mart.v_sales AS
 SELECT
     f.order_id,
     f.item_seq,
@@ -36,7 +39,7 @@ LEFT JOIN mart.dim_product p       ON p.product_key = f.product_key
 LEFT JOIN mart.dim_payment_type pt ON pt.payment_type_key = o.payment_type_key;
 
 -- One row per order.
-CREATE OR REPLACE VIEW mart.v_orders AS
+CREATE OR REPLACE TABLE mart.v_orders AS
 SELECT
     o.order_id,
     d.date,
@@ -62,7 +65,7 @@ LEFT JOIN mart.dim_customer c      ON c.customer_key = o.customer_key
 LEFT JOIN mart.dim_payment_type pt ON pt.payment_type_key = o.payment_type_key;
 
 -- One row per reviewed order: its latest review (see 22_fact_reviews.sql).
-CREATE OR REPLACE VIEW mart.v_reviews AS
+CREATE OR REPLACE TABLE mart.v_reviews AS
 SELECT
     r.review_id,
     o.order_id,
