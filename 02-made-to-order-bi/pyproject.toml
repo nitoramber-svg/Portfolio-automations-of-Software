@@ -1,0 +1,44 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mto-bi"
+version = "0.1.0"
+description = "BI web app for a made-to-order furniture workshop: Excel templates and CFDI invoices in, close rate, lead times, margin and orders at risk out"
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+dependencies = [
+    "pandas>=2.2",
+    "numpy>=1.26",
+    "openpyxl>=3.1",
+    "streamlit>=1.65",
+    "plotly>=5.24",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8", "ruff>=0.6"]
+
+[project.scripts]
+mto = "mto_bi.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "SIM"]
+
+[tool.ruff.lint.per-file-ignores]
+# Interface copy, demo catalog and test fixtures are long strings; code is formatted.
+"src/mto_bi/app/pages.py" = ["E501"]
+"src/mto_bi/sample.py" = ["E501"]
+"tests/*" = ["E501"]
