@@ -1,0 +1,57 @@
+# Event calendar (design §6.1-A).
+#
+#   planned     known in advance (Black Friday, Christmas, Carnaval, a campaign). During the
+#               event, the series in `expected` are not alerted on: a Black Friday spike is the
+#               plan working. Anything else still alerts (a Christmas delivery collapse is a
+#               problem even if Christmas was planned). `plan_uplift` raises that month's sales
+#               plan, and the run-rate of later months discounts it.
+#   unplanned   registered when an alert is confirmed (a strike, an outage). Its days are kept
+#               out of every series' baseline, so the detector doesn't learn that the abnormal is
+#               normal, and `bi impact` measures what it cost.
+#
+# Notes are shown in the dashboard, so they are in Spanish. Event days are left out of the
+# baselines (see bi_kpi.anomalies.detect for how). `impact_lag_days`: how long after the end its
+# effects keep landing (deliveries due later, reviews written later); default 14.
+
+events:
+  - name: Carnaval 2017
+    kind: planned
+    start: 2017-02-25
+    end: 2017-03-03
+    expected: [orders, gmv, carrier_pickups, late_dispatch]
+
+  - name: Black Friday 2017
+    kind: planned
+    start: 2017-11-20
+    end: 2017-12-03          # the promotion week and the dispatch backlog it leaves
+    expected: [orders, gmv, carrier_pickups, late_dispatch]
+    plan_uplift: 0.40        # the commercial plan for November: +40 % over the run rate
+
+  - name: Navidad 2017
+    kind: planned
+    start: 2017-12-11
+    end: 2017-12-31
+    expected: [orders, gmv]
+
+  - name: Carnaval 2018
+    kind: planned
+    start: 2018-02-10
+    end: 2018-02-16
+    expected: [orders, gmv, carrier_pickups, late_dispatch]
+
+  - name: Crisis de entregas de marzo 2018
+    kind: unplanned
+    start: 2018-03-07
+    end: 2018-04-06
+    note: >-
+      La detectaron las alertas de entregas a tiempo del 7 al 21 de marzo. Los vendedores
+      despacharon normal (sin señal adelantada): el problema estuvo en el transporte. Causa no
+      confirmada en fuentes públicas.
+
+  - name: Huelga de transportistas
+    kind: unplanned
+    start: 2018-05-21
+    end: 2018-05-31
+    note: >-
+      Huelga nacional de transportistas en Brasil. La anunció la caída de los despachos a
+      paquetería (alerta del 25 de mayo), siete días antes de la alerta de entregas a tiempo.

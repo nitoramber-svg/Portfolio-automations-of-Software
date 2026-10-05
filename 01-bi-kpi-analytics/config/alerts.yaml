@@ -1,0 +1,27 @@
+# Alert delivery (step 5).
+#
+#   mode: demo   writes every e-mail (.eml) and Slack message (.json) to the outbox folder;
+#                nothing leaves the machine. This is the default and what the tests use.
+#   mode: live   sends e-mail through SMTP_HOST / SMTP_PORT / SMTP_USER / SMTP_PASSWORD /
+#                SMTP_FROM and Slack through SLACK_WEBHOOK_URL (environment variables; a
+#                channel whose variables are missing is skipped with a warning).
+#
+# Routing follows row-level security (config/users.yaml): a regional manager gets the alerts of
+# their regions, never another's; national alerts go to `national`; a critical regional alert
+# also goes to `critical_copy`; a region without a manager goes to `national`. Sellers get
+# none: alerts are per region, not per seller.
+
+mode: demo
+outbox: outbox
+dashboard_url: http://localhost:8501
+slack_channel: "#bi-alertas"
+
+national: [direccion, analista]
+critical_copy: [direccion]
+
+# Demo addresses (example.com is reserved for examples and never delivers).
+emails:
+  direccion: direccion@example.com
+  analista: analista@example.com
+  gerente.sudeste: gerente.sudeste@example.com
+  gerente.nordeste: gerente.nordeste@example.com
