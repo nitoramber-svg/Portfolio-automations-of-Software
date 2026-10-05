@@ -8,6 +8,7 @@ Each folder is an independent project: it takes a role's day-to-day tasks and tu
 | # | Project | Role it targets | Status |
 |---|---|---|---|
 | 01 | [BI & KPI Analytics](01-bi-kpi-analytics/) | BI / Data Analyst (Amazon Quick Suite, SQL, AWS) | ✅ Done |
+| 02 | [Made-to-Order BI](02-made-to-order-bi/) | BI Analyst for a custom furniture manufacturer | ✅ Done |
 
 ---
 
@@ -40,6 +41,37 @@ An end-to-end BI system on **real data from Olist**, a Brazilian marketplace (~1
 
 Python · SQL · DuckDB · Streamlit · Plotly · pytest (127 tests) · GitHub Actions ·
 [Read more →](01-bi-kpi-analytics/)
+
+---
+
+## 02 · [Made-to-Order BI](02-made-to-order-bi/)
+
+A web dashboard a small custom furniture workshop can run **without anyone technical in the
+middle**: each area fills in an Excel template, administration drops in the SAT's invoice XML,
+and everyone gets their own board. Built for a real furniture maker in Mexico; this repository
+runs on a made-up workshop.
+
+![Summary](02-made-to-order-bi/docs/screenshots/01-resumen.png)
+
+**What it offers**
+
+- **Orders that will arrive late, before they do.** For each open piece: the stages it still
+  needs at the shop's recent pace, an estimated date against the promise, and the reason. Checked
+  against history: 72 % of the pieces it flags were late (guessing: 26 %), dates off by 2 days.
+- **Excel in, no IT needed.** Templates with drop-down lists; Mexican formats understood; every
+  mistake reported with its Excel row, the rest still loads.
+- **SAT invoices as they come.** CFDI 3.3 and 4.0, loose or in the bulk-download ZIP: billed vs
+  delivered, orders never invoiced, invoices with no order.
+- **Close rate, shop-floor times and margin by piece and brand**, with a plain-language reading
+  that says which margin fell and which cost explains it.
+- **Each area sees its own.** Sales never sees costs; the shop never sees prices.
+
+| Orders at risk, with the reason for each | Upload: every mistake with its row |
+|---|---|
+| ![Orders at risk](02-made-to-order-bi/docs/screenshots/04-riesgo.png) | ![Upload](02-made-to-order-bi/docs/screenshots/07-cargar.png) |
+
+Python · pandas · Streamlit · Plotly · openpyxl · CFDI XML · pytest (83 tests) · GitHub Actions ·
+[Read more →](02-made-to-order-bi/)
 
 ---
 

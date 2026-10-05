@@ -1,0 +1,36 @@
+name: 02 · Made-to-Order BI
+
+on:
+  push:
+    paths: ["02-made-to-order-bi/**", ".github/workflows/made-to-order-bi.yml"]
+  pull_request:
+    paths: ["02-made-to-order-bi/**", ".github/workflows/made-to-order-bi.yml"]
+
+defaults:
+  run:
+    working-directory: 02-made-to-order-bi
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: 02-made-to-order-bi/pyproject.toml
+      - run: pip install -e ".[dev]"
+      - name: Lint
+        run: |
+          ruff check src tests scripts streamlit_app.py
+          ruff format --check src tests scripts
+      - name: Tests
+        run: pytest
+      - name: Smoke run
+        run: |
+          mto sample --out /tmp/demo
+          mto templates --out /tmp/plantillas
+          mto check /tmp/plantillas
+          # The demo files carry typing mistakes on purpose: check must find them and fail.
+          if mto check /tmp/demo; then exit 1; fi
