@@ -1,0 +1,16 @@
+{
+  "endpoint": "opc.tcp://127.0.0.1:4840/sentinela/",
+  "intervalo_ms": 200,
+  "tamano_cola": 64,
+  "nodos": {
+    "E0": "ns=2;s=DUCTO-DEMO-01.E0.PT",
+    "E1": "ns=2;s=DUCTO-DEMO-01.E1.PT",
+    "E2": "ns=2;s=DUCTO-DEMO-01.E2.PT",
+    "E3": "ns=2;s=DUCTO-DEMO-01.E3.PT",
+    "E4": "ns=2;s=DUCTO-DEMO-01.E4.PT",
+    "E5": "ns=2;s=DUCTO-DEMO-01.E5.PT",
+    "E6": "ns=2;s=DUCTO-DEMO-01.E6.PT",
+    "q_entrada": "ns=2;s=DUCTO-DEMO-01.E0.FT",
+    "q_salida": "ns=2;s=DUCTO-DEMO-01.E6.FT"
+  }
+}

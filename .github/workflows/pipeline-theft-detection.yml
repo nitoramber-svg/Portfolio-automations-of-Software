@@ -1,0 +1,33 @@
+name: 03 · Sentinela Ductos
+
+on:
+  push:
+    paths: ["03-pipeline-theft-detection/**", ".github/workflows/pipeline-theft-detection.yml"]
+  pull_request:
+    paths: ["03-pipeline-theft-detection/**", ".github/workflows/pipeline-theft-detection.yml"]
+
+defaults:
+  run:
+    working-directory: 03-pipeline-theft-detection
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.10", "3.12"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - run: pip install -e ".[dev]"
+      - name: Tests
+        run: pytest
+      - name: Smoke run
+        run: |
+          sentinela simular --salida /tmp/lecturas.csv
+          sentinela analizar /tmp/lecturas.csv | tee /tmp/reporte.txt
+          # The demo shift hides exactly two taps: both must be found, nothing else reported.
+          grep -q "Total: 2 incidentes" /tmp/reporte.txt
+          sentinela campana --corridas 16 --dias 0.25

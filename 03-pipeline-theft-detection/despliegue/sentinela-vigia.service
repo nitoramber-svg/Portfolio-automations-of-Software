@@ -1,0 +1,24 @@
+# systemd: el vigía corre en OTRO equipo y avisa a la guardia si Sentinela cae o detecta una toma.
+#   sudo cp despliegue/sentinela-vigia.service /etc/systemd/system/
+#   sudo systemctl enable --now sentinela-vigia
+# /etc/sentinela/entorno-vigia: SENTINELA_TOKEN y SENTINELA_TELEGRAM_TOKEN.
+
+[Unit]
+Description=Sentinela Ductos - vigia de guardia
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=sentinela
+EnvironmentFile=/etc/sentinela/entorno-vigia
+ExecStart=/opt/sentinela/.venv/bin/sentinela vigia \
+    --url https://sentinela.interno:8443 --cada 30 \
+    --telegram-chat -1001234567890
+Restart=always
+RestartSec=10
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,10 @@
+# Datos de cada turno, respaldos y lecturas generadas
+registros/
+*.db
+lecturas*.csv
+
+# Secretos: nunca al repositorio
+usuarios.json
+certs/
+*.pem
+*.der

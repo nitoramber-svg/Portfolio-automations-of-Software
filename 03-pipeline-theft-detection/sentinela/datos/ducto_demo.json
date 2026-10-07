@@ -1,0 +1,58 @@
+{
+  "ducto": {
+    "id": "DUCTO-DEMO-01",
+    "nombre": "Poliducto demostrativo de 120 km",
+    "producto": "Gasolina",
+    "longitud_km": 120,
+    "diametro_m": 0.3048,
+    "velocidad_onda_m_s": 1100,
+    "densidad_kg_m3": 740,
+    "presion_entrada_bar": 80,
+    "presion_salida_bar": 15,
+    "caudal_nominal_m3_h": 900,
+    "precio_mxn_litro": 21.5
+  },
+  "estaciones": [
+    {"id": "E0", "km": 0,   "nombre": "Terminal de origen (bombeo)"},
+    {"id": "E1", "km": 20,  "nombre": "Válvula de seccionamiento km 20"},
+    {"id": "E2", "km": 40,  "nombre": "Válvula de seccionamiento km 40"},
+    {"id": "E3", "km": 60,  "nombre": "Estación intermedia km 60"},
+    {"id": "E4", "km": 80,  "nombre": "Válvula de seccionamiento km 80"},
+    {"id": "E5", "km": 100, "nombre": "Válvula de seccionamiento km 100"},
+    {"id": "E6", "km": 120, "nombre": "Terminal de almacenamiento y reparto"}
+  ],
+  "puntos_acceso": [
+    {"km": 6,   "nombre": "Acceso carretero km 6"},
+    {"km": 18,  "nombre": "Brecha agrícola km 18"},
+    {"km": 31,  "nombre": "Cruce de autopista km 31"},
+    {"km": 44,  "nombre": "Camino de terracería km 44"},
+    {"km": 52,  "nombre": "Puente vehicular km 52"},
+    {"km": 67,  "nombre": "Brecha ejidal km 67"},
+    {"km": 79,  "nombre": "Acceso carretero km 79"},
+    {"km": 88,  "nombre": "Cruce ferroviario km 88"},
+    {"km": 97,  "nombre": "Camino vecinal km 97"},
+    {"km": 109, "nombre": "Brecha agrícola km 109"}
+  ],
+  "brigadas": [
+    {"id": "B-NORTE",  "nombre": "Brigada Norte",  "base_km": 0},
+    {"id": "B-CENTRO", "nombre": "Brigada Centro", "base_km": 60},
+    {"id": "B-SUR",    "nombre": "Brigada Sur",    "base_km": 120}
+  ],
+  "respuesta": {
+    "velocidad_brigada_km_h": 45,
+    "alistamiento_min": 10
+  },
+  "deteccion": {
+    "npw_umbral_bar": 0.10,
+    "npw_refractario_s": 120,
+    "npw_rmse_max_s": 2.5,
+    "tolerancia_extremo_km": 2.5,
+    "cusum_k_m3h": 3.0,
+    "cusum_h": 2500,
+    "ventana_balance_s": 300,
+    "calibracion_s": 600,
+    "supresion_operativa_s": 600,
+    "ventana_confirmacion_s": 1200,
+    "perfil_incertidumbre_km": 2.0
+  }
+}
