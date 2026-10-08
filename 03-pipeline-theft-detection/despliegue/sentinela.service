@@ -1,0 +1,34 @@
+# systemd: Sentinela como servicio que arranca con el equipo y se reinicia solo si falla.
+#   sudo cp despliegue/sentinela.service /etc/systemd/system/
+#   sudo systemctl enable --now sentinela
+# Secretos en /etc/sentinela/entorno (permisos 600): SENTINELA_TOKEN, credenciales OPC-UA.
+
+[Unit]
+Description=Sentinela Ductos - deteccion de tomas clandestinas
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=sentinela
+Group=sentinela
+WorkingDirectory=/opt/sentinela
+EnvironmentFile=/etc/sentinela/entorno
+ExecStart=/opt/sentinela/.venv/bin/sentinela servidor \
+    --host 0.0.0.0 --puerto 8443 \
+    --usuarios /etc/sentinela/usuarios.json \
+    --certificado /etc/sentinela/tls/cert.pem --llave /etc/sentinela/tls/llave.pem \
+    --opcua /etc/sentinela/mapa_opcua.json \
+    --bd /var/lib/sentinela/turno.db --respaldo-cada 60 \
+    --sin-navegador
+Restart=always
+RestartSec=5
+
+# Endurecimiento: el proceso no puede escalar privilegios ni escribir fuera de su directorio de datos.
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ReadWritePaths=/var/lib/sentinela
+
+[Install]
+WantedBy=multi-user.target

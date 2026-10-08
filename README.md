@@ -9,6 +9,7 @@ Each folder is an independent project: it takes a role's day-to-day tasks and tu
 |---|---|---|---|
 | 01 | [BI & KPI Analytics](01-bi-kpi-analytics/) | BI / Data Analyst (Amazon Quick Suite, SQL, AWS) | ✅ Done |
 | 02 | [Made-to-Order BI](02-made-to-order-bi/) | BI Analyst for a custom furniture manufacturer | ✅ Done |
+| 03 | [Sentinela Ductos](03-pipeline-theft-detection/) | Industrial software / SCADA data engineer (oil & gas) | ✅ Done |
 
 ---
 
@@ -72,6 +73,35 @@ runs on a made-up workshop.
 
 Python · pandas · Streamlit · Plotly · openpyxl · CFDI XML · pytest (83 tests) · GitHub Actions ·
 [Read more →](02-made-to-order-bi/)
+
+---
+
+## 03 · [Sentinela Ductos](03-pipeline-theft-detection/)
+
+Pemex lost **MXN 23.5 billion to fuel theft in 2025**: one illegal tap every 51 minutes, and the
+tool that finds them takes about 30 days. Sentinela reads the pressure and flow a SCADA already
+has and, **within minutes**, says there is a tap, at which km, which access road and brigade, and
+how many litres are being stolen. Runs on a simulated pipeline.
+
+![Dashboard](03-pipeline-theft-detection/docs/screenshots/01-tablero.jpg)
+
+**What it offers**
+
+- **A tap found in ~2.3 min and placed within a few hundred metres**, from the pressure wave the
+  drilling sends down the line; slow-opening taps caught by the flow balance and the pressure profile.
+- **No crying wolf.** Pump maneuvers (even unlogged ones) and failing transmitters are told apart:
+  0 false alarms in 2 simulated days; 100 % detection from 5 m³/h in a 160-tap Monte Carlo campaign.
+- **Live SCADA data as it really arrives**: HTTP and encrypted OPC-UA, with late, lost and junk
+  readings handled so a data gap is never read as a tap.
+- **Ready to run 24/7**: roles and audit trail, HTTPS, hot backups, restart without losing the
+  shift, and a watchdog that pages the on-call team on Telegram.
+
+| Incidents, each step signed by who did it | SCADA link and data quality |
+|---|---|
+| ![Incidents](03-pipeline-theft-detection/docs/screenshots/02-incidentes.jpg) | ![Data quality](03-pipeline-theft-detection/docs/screenshots/03-calidad-scada.jpg) |
+
+Python (standard library) · SQLite · OPC-UA · vanilla JS · 37 tests · GitHub Actions ·
+[Read more →](03-pipeline-theft-detection/)
 
 ---
 

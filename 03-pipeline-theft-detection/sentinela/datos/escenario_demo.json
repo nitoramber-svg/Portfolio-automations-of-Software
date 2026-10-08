@@ -1,0 +1,21 @@
+{
+  "descripcion": "3 horas de operación: maniobras normales, una falla de sensor, una toma abrupta y una toma de apertura lenta.",
+  "duracion_s": 10800,
+  "semilla": 7,
+  "ruido_presion_bar": 0.02,
+  "ruido_caudal_m3h": 2.0,
+  "sesgo_medidor_salida_m3h": 1.2,
+  "atenuacion_km": 80,
+  "decaimiento_onda_s": 90,
+  "eventos": [
+    {"tipo": "operacion", "t": 1500, "extremo": "entrada", "delta_bar": -6,
+     "descripcion": "Paro programado de bomba BP-2 en terminal de origen", "registrada": true},
+    {"tipo": "operacion", "t": 1800, "extremo": "entrada", "delta_bar": 6,
+     "descripcion": "Arranque de bomba BP-2 en terminal de origen", "registrada": true},
+    {"tipo": "falla_sensor", "t": 2700, "estacion": "E3", "delta_bar": -1.5, "duracion_s": 300},
+    {"tipo": "toma", "t": 3600, "km": 47.3, "caudal_m3h": 18, "apertura_s": 0, "duracion_s": 2400},
+    {"tipo": "operacion", "t": 6600, "extremo": "salida", "delta_bar": -3,
+     "descripcion": "Apertura de válvula hacia tanque TV-5 en terminal de reparto", "registrada": false},
+    {"tipo": "toma", "t": 7500, "km": 93.8, "caudal_m3h": 10, "apertura_s": 900, "duracion_s": 3000}
+  ]
+}
