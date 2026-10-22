@@ -10,6 +10,7 @@ Each folder is an independent project: it takes a role's day-to-day tasks and tu
 | 01 | [BI & KPI Analytics](01-bi-kpi-analytics/) | BI / Data Analyst (Amazon Quick Suite, SQL, AWS) | ✅ Done |
 | 02 | [Made-to-Order BI](02-made-to-order-bi/) | BI Analyst for a custom furniture manufacturer | ✅ Done |
 | 03 | [Sentinela Ductos](03-pipeline-theft-detection/) | Industrial software / SCADA data engineer (oil & gas) | ✅ Done |
+| 04 | [Radar Antifraude](04-bank-fraud-radar/) | Fraud analytics / data scientist in retail banking | ✅ Done · showcase only, code private |
 
 ---
 
@@ -105,10 +106,39 @@ Python (standard library) · SQLite · OPC-UA · vanilla JS · 37 tests · GitHu
 
 ---
 
+## 04 · [Radar Antifraude](04-bank-fraud-radar/)
+
+BanCoppel received **≈1.07 million complaints in the first nine months of 2025**, the most of any bank in Mexico,
+and most complaints across the system are fraud. Radar Antifraude scores every operation as it happens and says
+why, finds the shop where cards were cloned, warns exposed customers before they complain, and triages complaints
+with their deadlines. Runs on synthetic data. **Showcase only: the code is proprietary and private.**
+
+![Panel](04-bank-fraud-radar/docs/screenshots/02-panel.jpg)
+
+**What it offers**
+
+- **Fraud caught at the moment of the operation**: 91 % precision on the block threshold; 88 % of fraud
+  (95 % of the amount) caught on the review threshold, flagging only 1.6 % of operations.
+- **Amounts judged like a person would**: against the customer's monthly spending and available balance, which
+  protects low-balance customers and lifted high-risk detection from 58 % to 66 %.
+- **The skimmer, found**: all 3 compromised shops identified from the complaints, plus the list of exposed
+  customers who have not complained yet.
+- **Every alert explains itself**, and an AI outreach agent drafts the pitch and books the meeting, with a person
+  approving every message.
+
+| One alert, explained | Where the cards were cloned |
+|---|---|
+| ![Alert](04-bank-fraud-radar/docs/screenshots/03-alerta.jpg) | ![Compromised merchants](04-bank-fraud-radar/docs/screenshots/04-puntos-compromiso.jpg) |
+
+Vanilla JS · Python · Claude API · 14 tests · GitHub Actions ·
+[Read more →](04-bank-fraud-radar/)
+
+---
+
 ## Also see
 
 - [GovIntel MX](https://github.com/nitoramber-svg/GovIntel-MX) — procurement intelligence platform over 520k+ Mexican public contracts (FastAPI, PostgreSQL, Celery, Docker).
 
 ## License
 
-[MIT](LICENSE)
+[MIT](LICENSE), except [04 · Radar Antifraude](04-bank-fraud-radar/), which is shown here but not licensed (see its [NOTICE](04-bank-fraud-radar/NOTICE.md)).
