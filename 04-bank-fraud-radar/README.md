@@ -4,11 +4,15 @@
 > is **proprietary and kept in a private repository**; it is not covered by this portfolio's MIT license
 > (see [NOTICE](NOTICE.md)). A live demo or a code walkthrough is available on request.
 
-BanCoppel, the bank of Mexican family-owned Grupo Coppel, received **≈1.07 million complaints from January to
-September 2025**, more than any other bank in Mexico and over twice the runner-up (Banco Azteca, 503,629). Across
-the banking system, **72 % of complaints in that period were for suspected fraud**. Each complaint costs a refund,
-the work of answering it within the regulatory deadline, regulatory exposure and the trust of customers who are
-often banking for the first time.
+**Designed around the case of BanCoppel**, the bank of Mexican family-owned Grupo Coppel, as independent work —
+**the bank does not use it** and took no part in building it.
+
+BanCoppel received **≈1.07 million complaints from January to September 2025**, more than any other bank in Mexico
+and over twice the runner-up (Banco Azteca, 503,629). Across the banking system, **72 % of complaints in that period
+were for suspected fraud**, and Expansión put fraud claims against BanCoppel at **MXN 11,213 M in the first half of
+2026**. Each complaint costs a refund, the work of answering it within the regulatory deadline, regulatory exposure
+and the trust of customers who are often banking for the first time. That is money lost by catching fraud late and
+answering complaints by hand — the part software recovers, with the data the bank already has.
 
 Fraud leaves patterns in data the bank already has. Radar Antifraude reads card and transfer operations plus the
 complaints, and:

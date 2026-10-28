@@ -11,6 +11,7 @@ Each folder is an independent project: it takes a role's day-to-day tasks and tu
 | 02 | [Made-to-Order BI](02-made-to-order-bi/) | BI Analyst for a custom furniture manufacturer | ✅ Done |
 | 03 | [Sentinela Ductos](03-pipeline-theft-detection/) | Industrial software / SCADA data engineer (oil & gas) | ✅ Done |
 | 04 | [Radar Antifraude](04-bank-fraud-radar/) | Fraud analytics / data scientist in retail banking | ✅ Done · showcase only, code private |
+| 05 | [Copiloto de Contingencias](05-viva-contingencies/) | Ops / passenger-rights software for an airline in a grounded-fleet crisis | ✅ Done · showcase only, code private |
 
 ---
 
@@ -108,10 +109,14 @@ Python (standard library) · SQLite · OPC-UA · vanilla JS · 37 tests · GitHu
 
 ## 04 · [Radar Antifraude](04-bank-fraud-radar/)
 
-BanCoppel received **≈1.07 million complaints in the first nine months of 2025**, the most of any bank in Mexico,
-and most complaints across the system are fraud. Radar Antifraude scores every operation as it happens and says
-why, finds the shop where cards were cloned, warns exposed customers before they complain, and triages complaints
-with their deadlines. Runs on synthetic data. **Showcase only: the code is proprietary and private.**
+**Designed around the case of BanCoppel** — the bank of Mexican family-owned Grupo Coppel — as independent work;
+**the bank does not use it** and took no part in building it. BanCoppel received **≈1.07 million complaints in the
+first nine months of 2025**, the most of any bank in Mexico, and most complaints across the system are fraud;
+Expansión put fraud claims against it at **MXN 11,213 M in the first half of 2026**. Each complaint is a refund, the
+work of answering it within the deadline, regulatory exposure and lost trust — money lost by catching fraud late and
+answering complaints by hand, which is exactly what software recovers. Radar Antifraude scores every operation as it
+happens and says why, finds the shop where cards were cloned, warns exposed customers before they complain, and
+triages complaints with their deadlines. Runs on synthetic data. **Showcase only: the code is proprietary and private.**
 
 ![Panel](04-bank-fraud-radar/docs/screenshots/02-panel.jpg)
 
@@ -135,10 +140,40 @@ Vanilla JS · Python · Claude API · 14 tests · GitHub Actions ·
 
 ---
 
+## 05 · [Copiloto de Contingencias](05-viva-contingencies/)
+
+**Designed around the case of Viva Aerobus**, the Mexican low-cost airline that grounded up to **28 % of its fleet**
+over the Pratt & Whitney engine recall and was the airline with the most Profeco complaints in 2024 — built as
+independent work; **the airline does not use it**. A missing aircraft is not a software problem, but what the airline
+owes each stranded passenger is: food, discounts, a 25 % indemnity and hotel under art. 47 Bis, paid within 10 days.
+Handling that badly costs Viva about **MXN 293 M a year**; the copilot recovers roughly **MXN 230 M (≈ US$12.4 M)**
+of it. Runs on synthetic data. **Showcase only: the code is proprietary and private.**
+
+![Annual loss and recovery](05-viva-contingencies/docs/screenshots/02-perdida-recuperacion.jpg)
+
+**What it offers**
+
+- **The rights of every passenger, computed one by one** under art. 47 Bis, with the cause classified as attributable
+  or not.
+- **Re-accommodation to the final destination** — catching missed connections even from sub-1-hour delays, which go
+  unseen today: **1,288 of 1,401 stranded passengers (91.9 %)** re-routed, no flight oversold.
+- **Fair claims, paid on time**: 100 % of claims adjudicated automatically with the exact amount and the 10-day
+  deadline; overpaid and invalid claims flagged with the reason.
+- **Fleet decisions with numbers**: spare aircraft assigned to the rotations that recover the most passengers.
+
+| The grounded-day control center | Re-accommodation to the final destination |
+|---|---|
+| ![Contingency center](05-viva-contingencies/docs/screenshots/03-contingencias.jpg) | ![Re-accommodation](05-viva-contingencies/docs/screenshots/04-reacomodo.jpg) |
+
+Vanilla JS (single file, runs offline) · public sources + synthetic data ·
+[Read more →](05-viva-contingencies/)
+
+---
+
 ## Also see
 
 - [GovIntel MX](https://github.com/nitoramber-svg/GovIntel-MX) — procurement intelligence platform over 520k+ Mexican public contracts (FastAPI, PostgreSQL, Celery, Docker).
 
 ## License
 
-[MIT](LICENSE), except [04 · Radar Antifraude](04-bank-fraud-radar/), which is shown here but not licensed (see its [NOTICE](04-bank-fraud-radar/NOTICE.md)).
+[MIT](LICENSE), except [04 · Radar Antifraude](04-bank-fraud-radar/) and [05 · Copiloto de Contingencias](05-viva-contingencies/), which are shown here but not licensed (see their NOTICE: [04](04-bank-fraud-radar/NOTICE.md), [05](05-viva-contingencies/NOTICE.md)).
