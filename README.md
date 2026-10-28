@@ -12,6 +12,7 @@ Each folder is an independent project: it takes a role's day-to-day tasks and tu
 | 03 | [Sentinela Ductos](03-pipeline-theft-detection/) | Industrial software / SCADA data engineer (oil & gas) | ✅ Done · showcase only, code private |
 | 04 | [Radar Antifraude](04-bank-fraud-radar/) | Fraud analytics / data scientist in retail banking | ✅ Done · showcase only, code private |
 | 05 | [Copiloto de Contingencias](05-viva-contingencies/) | Ops / passenger-rights software for an airline in a grounded-fleet crisis | ✅ Done · showcase only, code private |
+| 06 | [Sentinela (Monitor + Scan)](06-sentinela-suite/) | Security software for small businesses & MSPs (ransomware early-warning, exposure scanning) | ✅ Done · showcase only, code private |
 
 ---
 
@@ -170,6 +171,33 @@ Vanilla JS (single file, runs offline) · public sources + synthetic data ·
 
 ---
 
+## 06 · [Sentinela — Monitor + Scan](06-sentinela-suite/)
+
+Two lightweight Windows security tools for small businesses and the MSPs that serve them, built to run **next to** the
+existing antivirus, not replace it. **Sentinela Monitor** plants decoy files and raises the alarm the moment ransomware
+starts encrypting — detect-and-alert only, never touching processes — and rolls every client up into one panel.
+**Sentinela Scan** is a scope-gated recon-and-scanning pipeline for authorized assessments, with a passive (read-only)
+mode for checking your own exposure and a client-ready branded report. Ships as proprietary binaries with no source.
+**Showcase only: code private.**
+
+| Monitor: a simulated ransomware detection | Scan: branded report with severity dashboard |
+|---|---|
+| ![Monitor panel](06-sentinela-suite/docs/screenshots/monitor-panel.jpg) | ![Scan report](06-sentinela-suite/docs/screenshots/scan-report.jpg) |
+
+**What they offer**
+
+- **Monitor — early warning the antivirus can miss**: a touched decoy is the strongest early sign of mass encryption;
+  alerts land in the Windows Event Log, checked every 15 minutes, with one MSP-wide panel.
+- **Scan — authorized by design**: a signed scope file is the gate; passive checks (DNS/TLS/headers) run safely, active
+  testing only with written authorization; output is a branded HTML/PDF report with a severity dashboard.
+- **Safe and honest**: Monitor only detects and reports; Scan marks every finding "validate before delivery."
+
+Demo screenshots run locally on synthetic data (Monitor: a temp folder; Scan: a passive self-check of the reserved
+`example.com`). ·
+[Read more →](06-sentinela-suite/)
+
+---
+
 ## Also see
 
 - [GovIntel MX](https://github.com/nitoramber-svg/GovIntel-MX) — procurement intelligence platform over 520k+ Mexican public contracts (FastAPI, PostgreSQL, Celery, Docker).
@@ -180,7 +208,7 @@ All projects here are **showcase only**: each folder shows the work and the evid
 **source code is proprietary and kept in private repositories**. It is **not licensed** — no permission is granted
 to use, copy, reproduce or build on it without prior written permission (see each folder's NOTICE:
 [01](01-bi-kpi-analytics/NOTICE.md), [02](02-made-to-order-bi/NOTICE.md), [03](03-pipeline-theft-detection/NOTICE.md),
-[04](04-bank-fraud-radar/NOTICE.md), [05](05-viva-contingencies/NOTICE.md)).
+[04](04-bank-fraud-radar/NOTICE.md), [05](05-viva-contingencies/NOTICE.md), [06](06-sentinela-suite/NOTICE.md)).
 
 The [MIT](LICENSE) license covers only this portfolio's own wrapper — the index page and the showcase write-ups —
 not the software they describe.
