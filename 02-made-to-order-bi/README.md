@@ -1,6 +1,8 @@
 # 02 · Made-to-Order BI — a web dashboard for a custom furniture workshop
 
-[![CI](https://github.com/nitoramber-svg/Portfolio-automations-of-Software/actions/workflows/made-to-order-bi.yml/badge.svg)](https://github.com/nitoramber-svg/Portfolio-automations-of-Software/actions/workflows/made-to-order-bi.yml)
+> **Showcase only.** This folder shows what the system does and the evidence that it works. The source code
+> is **proprietary and kept in a private repository**; it is not covered by this portfolio's MIT license
+> (see [NOTICE](NOTICE.md)). A live demo or a code walkthrough is available on request.
 
 A web app a small furniture workshop can use **without anyone technical in the middle**: people
 fill in four Excel templates (or paste what their system exports), drop in the SAT's invoice

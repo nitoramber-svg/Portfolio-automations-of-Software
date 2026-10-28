@@ -1,6 +1,8 @@
 # 01 · BI & KPI Analytics — Olist e-commerce
 
-[![CI](https://github.com/nitoramber-svg/Portfolio-automations-of-Software/actions/workflows/bi-kpi-analytics.yml/badge.svg)](https://github.com/nitoramber-svg/Portfolio-automations-of-Software/actions/workflows/bi-kpi-analytics.yml)
+> **Showcase only.** This folder shows what the system does and the evidence that it works. The source code
+> is **proprietary and kept in a private repository**; it is not covered by this portfolio's MIT license
+> (see [NOTICE](NOTICE.md)). A live demo or a code walkthrough is available on request.
 
 An end-to-end Business Intelligence system on **real, public data from Olist**, a Brazilian
 e-commerce marketplace (~100k orders, 2016–2018), built from the requirements of a real BI

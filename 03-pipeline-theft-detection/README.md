@@ -1,6 +1,8 @@
 # 03 · Sentinela Ductos — real-time detection of illegal fuel taps on pipelines
 
-[![CI](https://github.com/nitoramber-svg/Portfolio-automations-of-Software/actions/workflows/pipeline-theft-detection.yml/badge.svg)](https://github.com/nitoramber-svg/Portfolio-automations-of-Software/actions/workflows/pipeline-theft-detection.yml)
+> **Showcase only.** This folder shows what the system does and the evidence that it works. The source code
+> is **proprietary and kept in a private repository**; it is not covered by this portfolio's MIT license
+> (see [NOTICE](NOTICE.md)). A live demo or a code walkthrough is available on request.
 
 Pemex, Mexico's state oil company, lost **MXN 23.5 billion to fuel theft in 2025**. In early 2026 thieves drilled **one illegal tap every 51 minutes**. The tool that finds taps from inside the pipe, the instrumented pig, takes **about 30 days** to report. By then the tap has been milked and abandoned.
 

@@ -7,9 +7,9 @@ Each folder is an independent project: it takes a role's day-to-day tasks and tu
 
 | # | Project | Role it targets | Status |
 |---|---|---|---|
-| 01 | [BI & KPI Analytics](01-bi-kpi-analytics/) | BI / Data Analyst (Amazon Quick Suite, SQL, AWS) | ✅ Done |
-| 02 | [Made-to-Order BI](02-made-to-order-bi/) | BI Analyst for a custom furniture manufacturer | ✅ Done |
-| 03 | [Sentinela Ductos](03-pipeline-theft-detection/) | Industrial software / SCADA data engineer (oil & gas) | ✅ Done |
+| 01 | [BI & KPI Analytics](01-bi-kpi-analytics/) | BI / Data Analyst (Amazon Quick Suite, SQL, AWS) | ✅ Done · showcase only, code private |
+| 02 | [Made-to-Order BI](02-made-to-order-bi/) | BI Analyst for a custom furniture manufacturer | ✅ Done · showcase only, code private |
+| 03 | [Sentinela Ductos](03-pipeline-theft-detection/) | Industrial software / SCADA data engineer (oil & gas) | ✅ Done · showcase only, code private |
 | 04 | [Radar Antifraude](04-bank-fraud-radar/) | Fraud analytics / data scientist in retail banking | ✅ Done · showcase only, code private |
 | 05 | [Copiloto de Contingencias](05-viva-contingencies/) | Ops / passenger-rights software for an airline in a grounded-fleet crisis | ✅ Done · showcase only, code private |
 
@@ -176,4 +176,11 @@ Vanilla JS (single file, runs offline) · public sources + synthetic data ·
 
 ## License
 
-[MIT](LICENSE), except [04 · Radar Antifraude](04-bank-fraud-radar/) and [05 · Copiloto de Contingencias](05-viva-contingencies/), which are shown here but not licensed (see their NOTICE: [04](04-bank-fraud-radar/NOTICE.md), [05](05-viva-contingencies/NOTICE.md)).
+All projects here are **showcase only**: each folder shows the work and the evidence that it works, but the
+**source code is proprietary and kept in private repositories**. It is **not licensed** — no permission is granted
+to use, copy, reproduce or build on it without prior written permission (see each folder's NOTICE:
+[01](01-bi-kpi-analytics/NOTICE.md), [02](02-made-to-order-bi/NOTICE.md), [03](03-pipeline-theft-detection/NOTICE.md),
+[04](04-bank-fraud-radar/NOTICE.md), [05](05-viva-contingencies/NOTICE.md)).
+
+The [MIT](LICENSE) license covers only this portfolio's own wrapper — the index page and the showcase write-ups —
+not the software they describe.
