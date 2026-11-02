@@ -13,6 +13,7 @@ Each folder is an independent project: it takes a role's day-to-day tasks and tu
 | 04 | [Radar Antifraude](04-bank-fraud-radar/) | Fraud analytics / data scientist in retail banking | ✅ Done · showcase only, code private |
 | 05 | [Copiloto de Contingencias](05-viva-contingencies/) | Ops / passenger-rights software for an airline in a grounded-fleet crisis | ✅ Done · showcase only, code private |
 | 06 | [Sentinela (Monitor + Scan)](06-sentinela-suite/) | Security software for small businesses & MSPs (ransomware early-warning, exposure scanning) | ✅ Done · showcase only, code private |
+| 07 | [SyncHub](07-synchub-integration/) | Integration Engineer (Python/Django, REST APIs + webhooks, event-driven, financial reconciliation, PropTech) | ✅ Done · showcase only, code private |
 
 ---
 
@@ -198,6 +199,41 @@ Demo screenshots run locally on synthetic data (Monitor: a temp folder; Scan: a 
 
 ---
 
+## 07 · [SyncHub](07-synchub-integration/)
+
+A PropTech **system-integration & reconciliation hub**, built requirement by requirement from a remote
+Integration Engineer job posting. A property manager runs a **PMS** (leases, reservations, tenant payments)
+and a separate **accounting/CRM** system; the two drift apart and money leaks between them. SyncHub keeps
+them in sync via webhooks and event-driven processing, then **reconciles that the money matches** — catching
+missing invoices, amount mismatches, double billing and unreflected cancellations. Synthetic data; the two
+external systems are simulations that ship with the project. **Showcase only: code private.**
+
+![SyncHub reconciliation report catching discrepancies](07-synchub-integration/docs/screenshots/reconciliation-report.jpg)
+
+**What it offers**
+
+- **Reconciliation that finds the money.** The nightly batch **reconciles 207 transactions and catches 5/5
+  injected discrepancies (100%), surfacing USD 9,242 at risk** — leaks invisible on either system's own
+  dashboard, each flagged with a probable cause and the exact amount, FX- and tax-aware.
+- **Webhooks done right.** HMAC-SHA256 signature verification and per-delivery idempotency keys, so a replayed
+  webhook is logged as a duplicate and **never double-applies**.
+- **Reliable by design.** Event-driven (Celery/Redis) with exponential-backoff retries, a **dead-letter queue**
+  and a scheduled recovery sweep; config-driven mapping (currency, tax, catalog) stored as data.
+- **Scales to many systems.** A **connector/adapter** architecture over a canonical internal model — adding a
+  new PMS or accounting platform is **one connector, no core change** (a second stub PMS proves it).
+- **Operable.** Structured JSON logging, a monitoring dashboard, `/metrics/`, health/readiness endpoints, an
+  alerting hook, and a documented OpenAPI developer API with API-key auth.
+
+| Monitoring dashboard (sync health, queue, $ at risk) | Public developer API (OpenAPI) |
+|---|---|
+| ![Dashboard](07-synchub-integration/docs/screenshots/dashboard.jpg) | ![OpenAPI docs](07-synchub-integration/docs/screenshots/openapi-docs.jpg) |
+
+Python · Django · DRF · PostgreSQL · Celery · Redis · drf-spectacular (OpenAPI) · structured JSON logging ·
+pytest (27 tests) · Docker + docker-compose ·
+[Read more →](07-synchub-integration/)
+
+---
+
 ## Also see
 
 - [GovIntel MX](https://github.com/nitoramber-svg/GovIntel-MX) — procurement intelligence platform over 520k+ Mexican public contracts (FastAPI, PostgreSQL, Celery, Docker).
@@ -208,7 +244,8 @@ All projects here are **showcase only**: each folder shows the work and the evid
 **source code is proprietary and kept in private repositories**. It is **not licensed** — no permission is granted
 to use, copy, reproduce or build on it without prior written permission (see each folder's NOTICE:
 [01](01-bi-kpi-analytics/NOTICE.md), [02](02-made-to-order-bi/NOTICE.md), [03](03-pipeline-theft-detection/NOTICE.md),
-[04](04-bank-fraud-radar/NOTICE.md), [05](05-viva-contingencies/NOTICE.md), [06](06-sentinela-suite/NOTICE.md)).
+[04](04-bank-fraud-radar/NOTICE.md), [05](05-viva-contingencies/NOTICE.md), [06](06-sentinela-suite/NOTICE.md),
+[07](07-synchub-integration/NOTICE.md)).
 
 The [MIT](LICENSE) license covers only this portfolio's own wrapper — the index page and the showcase write-ups —
 not the software they describe.
