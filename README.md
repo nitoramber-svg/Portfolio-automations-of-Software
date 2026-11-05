@@ -14,6 +14,7 @@ Each folder is an independent project: it takes a role's day-to-day tasks and tu
 | 05 | [Copiloto de Contingencias](05-viva-contingencies/) | Ops / passenger-rights software for an airline in a grounded-fleet crisis | ✅ Done · showcase only, code private |
 | 06 | [Sentinela (Monitor + Scan)](06-sentinela-suite/) | Security software for small businesses & MSPs (ransomware early-warning, exposure scanning) | ✅ Done · showcase only, code private |
 | 07 | [SyncHub](07-synchub-integration/) | Integration Engineer (Python/Django, REST APIs + webhooks, event-driven, financial reconciliation, PropTech) | ✅ Done · showcase only, code private |
+| 08 | [EA Copilot](08-ea-copilot/) | Executive Assistant, remote (AI inbox/calendar/meetings/travel automation, human-in-the-loop, over Google Workspace · Slack · Notion) | ✅ Done · showcase only, code private |
 
 ---
 
@@ -234,6 +235,46 @@ pytest (27 tests) · Docker + docker-compose ·
 
 ---
 
+## 08 · [EA Copilot](08-ea-copilot/)
+
+An AI copilot that automates the repetitive **~70%** of an Executive Assistant's job,
+built requirement by requirement from a remote EA job posting. It triages the inbox,
+orchestrates the calendar across time zones, writes the morning brief, runs the meeting
+lifecycle, assembles travel and expenses, drafts SOPs, and never drops a follow-up —
+all on one dashboard with a single **approvals queue**. **AI-augmented, not autonomous:**
+every outgoing item is a **draft a human approves** — it never sends, books, posts or
+spends on its own. Runs on synthetic data (a fictional founder). **Showcase only: code private.**
+
+![EA Copilot dashboard](08-ea-copilot/docs/screenshots/dashboard.jpg)
+
+**What it offers**
+
+- **The inbox, triaged and half-answered.** Classifies 8 emails (urgent / needs-reply /
+  schedule / FYI), summarizes threads, and **drafts replies for 7 of the 8 (88%)** in the
+  exec's voice — each waiting in the approvals queue, nothing sent.
+- **A calendar that defends the day.** Catches conflicts, protects focus blocks, and proposes
+  slots rendered across **US / Canada / Mexico** time zones (DST-correct).
+- **One step ahead.** A morning brief collapses meetings + prep, top priorities, flagged email
+  and **the 2 overdue follow-ups** onto one screen.
+- **Meetings, travel, expenses, SOPs, follow-ups** — each a module: notes → action items →
+  draft follow-up; trip options → itinerary draft; receipts → categorized expense report.
+- **Adapts to the exec's tools.** A **connector/adapter** architecture over a canonical model —
+  adding **Google Workspace, Slack or Notion** for real is **one connector, no core change**;
+  connection is one-time **OAuth** (no password ever touches the app).
+- **Safe by construction.** The approval gate makes auto-send impossible — proven by tests.
+  On the seeded day it queues **14 drafts, 0 sent automatically**, saving an estimated
+  **~8.9 h/week**.
+
+| Triaged inbox with a draft reply in the approvals queue | The daily brief on one screen |
+|---|---|
+| ![Inbox triage + approval](08-ea-copilot/docs/screenshots/inbox-triage-approval.jpg) | ![Daily brief](08-ea-copilot/docs/screenshots/daily-brief.jpg) |
+
+Python · FastAPI · SQLite · Claude API (`claude-opus-5-5`) + offline mock fallback ·
+connector/adapter over Google Workspace / Slack / Notion · pytest (28 tests) · native desktop app or local server, no Docker ·
+[Read more →](08-ea-copilot/)
+
+---
+
 ## Also see
 
 - [GovIntel MX](https://github.com/nitoramber-svg/GovIntel-MX) — procurement intelligence platform over 520k+ Mexican public contracts (FastAPI, PostgreSQL, Celery, Docker).
@@ -245,7 +286,7 @@ All projects here are **showcase only**: each folder shows the work and the evid
 to use, copy, reproduce or build on it without prior written permission (see each folder's NOTICE:
 [01](01-bi-kpi-analytics/NOTICE.md), [02](02-made-to-order-bi/NOTICE.md), [03](03-pipeline-theft-detection/NOTICE.md),
 [04](04-bank-fraud-radar/NOTICE.md), [05](05-viva-contingencies/NOTICE.md), [06](06-sentinela-suite/NOTICE.md),
-[07](07-synchub-integration/NOTICE.md)).
+[07](07-synchub-integration/NOTICE.md), [08](08-ea-copilot/NOTICE.md)).
 
 The [MIT](LICENSE) license covers only this portfolio's own wrapper — the index page and the showcase write-ups —
 not the software they describe.
