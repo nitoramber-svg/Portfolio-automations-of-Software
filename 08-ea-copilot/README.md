@@ -64,6 +64,14 @@ the anti-pattern):**
 The send/book/post paths all route through the **approval gate**, so going live
 never turns off the human-in-the-loop guarantee.
 
+**Ready to operate on day 1 — an in-app Connections page.** The operator connects
+real accounts from the dashboard, no code required: OAuth for Google/Slack (sign in
+on the provider — there is deliberately no password box in the app) and a paste-token
+field for Notion. Credentials are stored in a local, gitignored `.env`, masked in the
+UI, and the requested scopes are draft-only.
+
+![Connections — day-1 onboarding for Google, Slack and Notion](docs/screenshots/connections.jpg)
+
 ---
 
 ## Measured impact (computed from the synthetic dataset, not fabricated)
